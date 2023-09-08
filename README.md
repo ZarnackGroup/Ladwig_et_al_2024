@@ -1,1 +1,1 @@
-# Impacts_MAJIQ_splicing_analysis
+# Impact of RNASeq library characteristics on alternative splicing analysis
