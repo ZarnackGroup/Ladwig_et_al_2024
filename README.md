@@ -1,1 +1,2 @@
-# Impact of RNASeq library characteristics on alternative splicing analysis
+# Impact of RNASeq read depth and read length on alternative splicing analysis
+****
