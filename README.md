@@ -4,15 +4,17 @@ This Github repository provides the code the for the publication Ladwig et al. 2
 
 ## 1 Preprocessing and alternative splicing analysis with MAJIQ
 ****
+The RMarkdown contains the preprocessing steps of the raw reads and the following MAJIQ scripts for alternative splicing analysis. 
 
 The rendered HTML-report can be accessed at ... .
 
 ## 2 Impact of library characteristics on alternative splice analysis
 ****
 The R scripts contain the code used to investigate the influence of the characteristics on: 
+- read alignment
 - LSV detection
 - LSV quantification
-- Alternative splicing event types
+- Alternative splicing event types distribution
 
 
 
