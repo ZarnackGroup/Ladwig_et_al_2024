@@ -10,7 +10,7 @@ The rendered HTML-report can be accessed at ... .
 
 ## 2 Impact of library characteristics on alternative splice analysis
 ****
-The R scripts contain the code used to investigate the influence of the characteristics on: 
+The R scripts contain the code used to investigate the influence of read depth, read length and sample size on: 
 - read alignment
 - LSV detection
 - LSV quantification
