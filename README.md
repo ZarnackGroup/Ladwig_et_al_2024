@@ -14,7 +14,7 @@ The R scripts contain the code used to investigate the influence of the characte
 - read alignment
 - LSV detection
 - LSV quantification
-- Alternative splicing event types distribution
+- alternative splicing event types distribution
 
 
 
