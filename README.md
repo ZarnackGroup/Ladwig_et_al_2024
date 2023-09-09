@@ -2,12 +2,11 @@
 ****
 1-2 sentences what was done. 
 
-## 1 Preprocessing of raw sequencing reads
+## 1 Preprocessing and splicing analysis with MAJIQ
 ****
 
-## 2 Alternative splicing analysis using MAJIQ
+## 2 Impact of library characteristics on splice analysis
 ****
 
-## 3 Processing output in R
-****
+
 
