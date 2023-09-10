@@ -425,8 +425,8 @@ dev.off()
 
 # Influence on size of detected splicing changes (Fig 4)
 
-Influence on the size of detected splicing changes is determined by plotting the cumulative fraction of dPSIs 
-and probability changing values for each read length. 
+Influence on the size of detected splicing changes is determined by plotting the cumulative fraction 
+of dPSIs and probability changing values for each read length. 
 
 ```{r}
 dPSIs[[1]]$readLength = "036"
@@ -589,7 +589,6 @@ deltaPSI_U2AF2_50_vs_36 = U2AF2_50_filtered_match_36$mean_dpsi_per_lsv_junction 
 deltaPSI_U2AF2_36_vs_50 = U2AF2_36_filtered_match_50$mean_dpsi_per_lsv_junction %>%
   strsplit(split = ";") %>% 
   sapply(FUN = "[[",1) %>% as.numeric
-
 
 ##########################
 # significant binary LSVs
