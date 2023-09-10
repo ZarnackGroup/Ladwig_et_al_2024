@@ -1,0 +1,312 @@
+---
+title: "Preprocessing and alternative splicing analysis with MAJIQ"
+author: "Annika Ladwig"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<style>
+div.mint {background-color:#D9EAE4; border-radius: 5px; padding: 20px;}
+</style>
+
+<!--# <span style="color:#2C5753"> ****
+
+<div class = "mint">
+
+* **read length** (U2AF2 & UPF1 gene knockdown)
+
+* **read depth** (U2AF2 gene knockdown)
+
+* **sample size** (endodermal cell vs H1 cell line)-->
+
+</div>
+
+<br>
+
+![](C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/GS/workflow_cr.png){width=70%}
+
+<br>
+<br>
+<br>
+
+# <span style="color:#2C5753"> **1 Fastq-dump** - loading FASTQ files from SRA database
+***
+```{r, engine = 'bash', eval = FALSE}
+fastq-dump --gzip --skip-technical --readids --split-3 --outdir /fastq_files/ SRR3469464
+```
+
+<br>
+
+# <span style="color:#2C5753"> **2 Trimmomatic** - read preprocessing &nbsp; &nbsp; <span style="color:#2373F6"> $\bullet$ generate different read length
+***
+**1.** trim adapters 
+
+**2.** sliding window trimming 
+
+**3.** remove reads shorter than 100 nt
+
+**4.** trim reads to 100, 75, 50 and 36 nt
+
+```{r, engine = 'bash', eval = FALSE, R.options = list(width = 10000)}
+read_length=(100 75 50 36)
+
+for length in ${read_length[@]}; do
+  for SRR in `ls -1 *_1.fastq.gz | sed 's/\_1.fastq.gz//'`; do                # go through all read pairs
+    echo trimmomatic PE $SRR\_1.fastq.gz $SRR\_2.fastq.gz \                   # pass paired forward and reverse reads
+    $length\_$SRR\_R1_paired.fastq.gz $length\_$SRR\_R1_unpaired.fastq.gz \   # define 4 output files
+    $length\_$SRR\_R2_paired.fastq.gz $length\_$SRR\_R2_unpaired.fastq.gz \   
+    ILLUMINACLIP:TruSeq3-PE.fa:2:30:10:8:true \                               # cut adapters                                                        
+    SLIDINGWINDOW:4:20 \                                                      # sliding window trimming                                                     
+    MINLEN:100 \                                                              # remove reads < 100 nt                            
+    CROP:$length >> /processed_reads/endodermal_cell/cmd_file_$length     
+  done
+  bash /processed_reads/endodermal_cell/cmd_file_$length                  
+done
+```
+
+<br>
+
+# <span style="color:#2C5753"> **3 FastQC** - quality control
+***
+```{r, engine = 'bash', eval = FALSE}
+# check if adapters are removed
+fastqc *.bam --o /star_mapping/U2AF2/
+```
+
+<br>
+
+# <span style="color:#2C5753"> **4 STAR** - read mapping
+***
+```{r, engine = 'bash', eval = FALSE}
+read_length=(100 75 50 36)
+gtf=gencode.v41.annotation.gtf
+genome=GRCh38.p13.genome.fa
+gd=genome_indices
+
+# GENERATING GENOME INDEXES for all read length
+for length in ${read_length[@]}; do
+  STAR \
+    --runThreadN 6 \
+    --runMode genomeGenerate \     # generate genome files
+    --genomeDir $gd/$length \      # path to previously created directory with genome index files 
+    --genomeFastaFiles $genome \   # FASTA files with genome reference sequences
+    --sjdbGTFfile $gtf \           # path to file with annotated transcripts
+    --sjdbOverhang $length-1       # specify max possible overhang for the reads
+done 
+
+# READ MAPPING
+for length in ${read_length[@]}; do
+  for SRR in `ls -1 $length\_*_R1_paired.fastq.gz | sed 's/\_R1_paired.fastq.gz//'`; do  
+    STAR \
+      --runThreadN 6 \
+      --genomeDir $gd/$length \
+      --readFilesCommand zcat \                                                         # unzip gzipped files
+      --readFilesIn $SRR\_R1_paired.fastq.gz $SRR\_R2_paired.fastq.gz \                 # path to forward and reverse read 
+      --outFileNamePrefix star_mapping/U2AF2/$SRR\_ \  # change file prefixes
+      --outFilterMultimapNmax 1 \                                                       # max number of multiple alignments allowed for a read
+      --outFilterMismatchNmax 999 \                                                     # max number of mismatches per pair --> switched off
+      --outFilterMismatchNoverLmax 0.04 \                                               # max number of mismatches per pair relative to read length
+      --outSAMtype BAM SortedByCoordinate                                               # set output type to BAM sorted by coordinate
+    done
+done
+```
+
+<br>
+
+# <span style="color:#2C5753"> **5 Samtools** - subsampling bam files &nbsp; &nbsp; <span style="color:#2373F6"> $\bullet$ generate different read depths
+***
+```{r, engine = 'bash', eval = FALSE}
+# shrink read depth to 30M, 25M, 20M, 15M, 10M, 2.5M, 1M reads
+
+# ~ 30M reads
+samtools view -b -s 0.96323430963552176957701491760975332532564543923003 U2AF2_100_CT_1.bam > read_depth/U2AF2_CT_1_30M_reads.bam
+```
+
+<br>
+
+# <span style="color:#2C5753"> **6 MAJIQ**
+***
+
+### <span style="color:#2C5753"> **6.1 `majiq build`** - LSV detection `r knitr::asis_output("&#x1F50E;")`  &nbsp; &nbsp; <span style="color:#2373F6"> $\bullet$ generate different sample size
+***
+
+#### <span style="color:#2C5753"> **Configuration file**
+
+To run `majiq build`, a configuration file is needed that contains the bam file paths and information about read length, strandness, the reference genome and the grouping of the experiments.
+
+The config file was created for 100, 75, 50 and 36 nt read length and for each of the 1 - 30 million reads read depth.
+
+To investigate the influence of the sample size, four different config files were created: three for the three combinations of two samples and one for the three samples. 
+
+```
+[info]
+readlen=100
+bamdirs=star_mapping/U2AF2/100/read_length
+genome=GRCh38
+strandness=reverse
+
+[experiments]
+U2AF2_100_KD=U2AF2_100_KD_1,U2AF2_100_KD_2
+U2AF2_100_CT=U2AF2_100_CT_1,U2AF2_100_CT_2
+```
+
+<br>
+
+#### <span style="color:#2C5753"> **LSV detection for different read length**:
+```{r, engine = 'bash', eval = FALSE}
+# FILES AND DIRS
+GFF3="gencode.v41.annotation.gff3"
+CONFIGFILE="majiq/build"
+OUTDIR="majiq/build"
+
+genes=(U2AF2 UPF1)
+read_length=(100 75 50 36)
+
+for gene in ${genes[@]}; do
+  for length in ${read_length[@]}; do
+    majiq build $GFF3 \
+    -c $CONFIGFILE/$gene/read_length/$length/${gene}_${length}_config_file_.txt \
+    -j 6 \
+    -o $OUTDIR/$gene/read_length/$length
+  done
+done
+```
+
+<br>
+
+#### <span style="color:#2C5753"> **LSV detection for different read depth**:
+```{r, engine = 'bash', eval = FALSE}
+# FILES AND DIRS
+GFF3="gencode.v41.annotation.gff3"
+CONFIGFILE="majiq/build"
+OUTDIR="majiq/build"
+
+reads=(30M 25M 20M 15M 10M 5M 2.5M 1M)
+
+for reads in ${reads[@]}; do
+  majiq build $GFF3 \
+  -c $CONFIGFILE/U2AF2/read_depth/$reads/U2AF2_${reads}_reads_config_file.txt \
+  -j 6 \
+  -o $OUTDIR/U2AF2/read_depth/$reads
+done
+```
+
+<br>
+
+#### <span style="color:#2C5753"> **LSV detection for different sample size**:
+```{r, engine = 'bash', eval = FALSE}
+# FILES AND DIRS
+GFF3="gencode.v41.annotation.gff3"
+BUILD="majiq/build/endodermal_vs_H1/100"
+
+# SAMPLE COMBINATIONS
+combos_2er=('_1_2' '_1_3' '_2_3')
+
+# MAJIQ BUILD 
+# 2 samples
+for combi in ${combos_2er[@]}; do
+  majiq build $GFF3 \
+  -c $BUILD/2_samples/sample$combi/endo_vs_H1_100_config_file_2_samples$combi.txt \
+  -j 6 \
+  -o $BUILD/2_samples/sample$combi
+done
+
+# 3 samples
+majiq build $GFF3 \
+-c $BUILD/3_samples/endo_vs_H1_100_config_file_3_samples.txt \
+-j 6 \
+-o $BUILD/3_samples
+```
+
+<br>
+
+### <span style="color:#2C5753"> **6.2 `majiq deltapsi`** - LSV quantification $\Delta\Psi$
+***
+```{r, engine = 'bash', eval = FALSE}
+# FILES AND DIRS
+BUILDDIR="majiq/build"
+OUTDIR="majiq/dpsi"
+
+genes=(U2AF2 UPF1)
+read_length=(100 75 50 36)
+
+for gene in ${genes[@]}; do
+  for length in ${read_length[@]}; do
+  majiq deltapsi \
+  -grp1 \
+  "${BUILDDIR}/$gene/read_length/$length/${gene}_${length}_KD_1.majiq" \
+  "${BUILDDIR}/$gene/read_length/$length/${gene}_${length}_KD_2.majiq" \
+  -grp2 \
+  "${BUILDDIR}/$gene/read_length/$length/${gene}_${length}_CT_1.majiq" \
+  "${BUILDDIR}/$gene/read_length/$length/${gene}_${length}_CT_2.majiq" \
+  --names $gene\_$length\_KD $gene\_$length\_CT \
+  -j 6 \
+  --output-type voila \
+  -o $OUTDIR/$gene/read_length/$length/
+  done
+done
+```
+
+<br>
+
+### <span style="color:#2C5753"> **6.3 `voila tsv`** - generate TSV files
+***
+```{r, engine = 'bash', eval = FALSE}
+# FILES AND DIRS
+BUILDDIR="majiq/build/"
+DPSIDIR="majiq/dpsi/"
+OUTDIR="majiq/voila/"
+
+genes=(U2AF2 UPF1)
+readLength=(100 75 50 36)
+
+# MAJIQ Voila
+# U2AF2 and UPF1
+for GENE in ${genes[@]}; do
+  for LENGTH in ${readLength[@]}; do
+    voila tsv \
+    -f "${OUTDIR}/${GENE}/${LENGTH}/${GENE}_${LENGTH}_KD_vs_CT_voila.tsv" \
+    --show-all \
+    --threshold 0.05 \
+    --changing-between-group-dpsi 0.05 \
+    --non-changing-between-group-dpsi 0.05 \
+    -j 6 \
+    "${BUILDDIR}/${GENE}/${LENGTH}/splicegraph.sql" \
+    "${DPSIDIR}/${GENE}/${LENGTH}/${GENE}_${LENGTH}_KD-${GENE}_${LENGTH}_CT.deltapsi.voila"   
+  done   
+done
+```
+
+<br>
+
+### <span style="color:#2C5753"> **6.4 `voila modulize`** - LSV classification 
+***
+
+```{r, engine = 'bash', eval = FALSE}
+#FILES AND DIRS
+BUILDDIR="majiq/build/read_depth"
+DPSIDIR="majiq/dpsi/read_depth"
+OUTDIR="majiq/modulize/read_depth"
+
+read_depth=(30M 25M 20M 15M 10M 5M 2_5M 1M)
+
+# voila modulize 
+for reads in ${read_depth[@]}; do
+  voila modulize \
+  --changing-between-group-dpsi 0.05 \
+  --non-changing-between-group-dpsi 0.05 \
+  --changing-between-group-dpsi-secondary 0.025 \
+  --show-all \
+  -j 6 \
+  -d "${OUTDIR}/${reads}" \
+  "${BUILDDIR}/${reads}/splicegraph.sql" \
+  "${DPSIDIR}/${reads}/KD_${reads}_reads-CT_${reads}_reads.deltapsi.voila"
+done
+```
+
+
+
