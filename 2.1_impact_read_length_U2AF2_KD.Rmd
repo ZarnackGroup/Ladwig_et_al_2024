@@ -107,7 +107,8 @@ extractMaxProbs <- function(x) {
 
 # 1 - Influence on read alignment (Fig 1D)
 
-The influence of read length on read alignment is determined by plotting the fraction of unique, multiple and unmapped reads for each read length (2 replicates each for knockdown and control).The alignment statistics are obtained from STAR. 
+The influence of read length on read alignment is determined by plotting the fraction of unique, multiple and unmapped reads 
+for each read length (2 replicates each for knockdown and control).The alignment statistics are obtained from STAR. 
 
 ```{r}
 # load star log files 
@@ -187,13 +188,15 @@ StarReport_StackedBarChart = ggarrange(
   ncol = 4, nrow = 1
   )
 
-StarReport_StackedBarChart = annotate_figure(StarReport_StackedBarChart, top = text_grob("Influence on read alignment", size = 12, just = "centre", face = "bold"))
-StarReport_StackedBarChart
+StarReport_StackedBarChart = annotate_figure(StarReport_StackedBarChart, 
+                                             top = text_grob("Influence on read alignment", size = 12, 
+                                             just = "centre", face = "bold"))
 ```
 
 # 2.1 - Influence on LSV detection (Fig 2A)
 
-The influence of read length on LSV detection is determined by counting the LSV hits (rows) in the tsv files received from MAJIQ for each read length. 
+The influence of read length on LSV detection is determined by counting the LSV hits (rows) 
+in the tsv files received from MAJIQ for each read length. 
 
 ```{r}
 # load dPSI tsv files from MAJIQ Quantifier as list
@@ -233,7 +236,8 @@ nLSVs_bar = ggplot(data=nLSVs_df, aes(x = readLength, y = nLSVs, fill = readLeng
 
 # 2.2 - Influence on LSV complexity (Fig 2B)
 
-The LSV complexity describes how many junctions an LSV has. To measure the influence on this, the LSVs with 2, 3, 4 or more than 4 junctions are counted for each read length. 
+The LSV complexity describes how many junctions an LSV has. To measure the influence on this, the LSVs
+with 2, 3, 4 or more than 4 junctions are counted for each read length. 
 
 ```{r}
 # count junctions of each LSV
@@ -278,7 +282,9 @@ StackedBarChart_nJunctions = ggplot(nJunctions_df, aes(x = readLength, y = Freq)
 
 # 3 - Influence on the significance of LSVs (Fig 3)
 
-Influence of read length on the significance of LSVs is determined by plotting the fraction of significantly regulated LSVs detected for each read length. LSVs are considered significant if dPSI is at least 0.05 and probability changing is at least 0.9. 
+Influence of read length on the significance of LSVs is determined by plotting the fraction of significantly 
+regulated LSVs detected for each read length. LSVs are considered significant if dPSI is at least 0.05 and 
+probability changing is at least 0.9. 
 
 For each LSV, the maximum dpsi and max probability changing is chosen. These usually belong to the same junction.
 
@@ -419,7 +425,8 @@ dev.off()
 
 # Influence on size of detected splicing changes (Fig 4)
 
-Influence on the size of detected splicing changes is determined by plotting the cumulative fraction of dPSIs and probability changing values for each read length. 
+Influence on the size of detected splicing changes is determined by plotting the cumulative fraction of dPSIs 
+and probability changing values for each read length. 
 
 ```{r}
 dPSIs[[1]]$readLength = "036"
@@ -819,9 +826,13 @@ sharedRegulation_scatterPlot6 = ggplot(data=correlationDataFrame_50_vs_36, aes(x
 
 # 5 - Influence on the distribution of alternative splice events types (Fig 5)
 
-Since there are alternative splicing events with different numbers of junctions, they are treated differently in terms of significance. 
+Since there are alternative splicing events with different numbers of junctions, they are treated 
+differently in terms of significance. 
 
-Alternative splicing events with two junctions (A3SS, A5SS, AFE, ALE, IR) are considered significantly regulated if at least one junction has a dPSI of at least 0.05 and a probability changing value of at least 0.9. Events with 4 junctions (CE and MEE) are considered significantly regulated if either both junctions starting from C1 or both junctions starting from C2 fulfill the regulation criteria. 
+Alternative splicing events with two junctions (A3SS, A5SS, AFE, ALE, IR) are considered significantly 
+regulated if at least one junction has a dPSI of at least 0.05 and a probability changing value of at least 0.9. 
+Events with 4 junctions (CE and MEE) are considered significantly regulated if either both junctions starting from C1 
+or both junctions starting from C2 fulfill the regulation criteria. 
 
 ```{r}
 # load voila modulize files 
