@@ -6,7 +6,7 @@ This Github repository provides the code the for the publication Ladwig et al. 2
 ****
 The Rmarkdown contains the code for the preprocessing of the raw reads and for the subsequent alternative splice analysis with MAJIQ.
 
-The rendered HTML report is available at https://annikala.github.io/. 
+The rendered HTML report is available at https://annikala.github.io/preprocessing_and_alternative_splice_analyis_MAJIQ.html/. 
 
 ## 2 Impact of library characteristics on alternative splice analysis
 ****
