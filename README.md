@@ -4,13 +4,9 @@ This Github repository provides the code the for the publication Ladwig et al. 2
 
 ## 1 Preprocessing and alternative splicing analysis with MAJIQ
 ****
-The RMarkdown contains the preprocessing steps of the raw reads and the following MAJIQ scripts for alternative splicing analysis. 
+The Rmarkdown contains the code for the pre-processing of the raw reads and for the subsequent alternative splice analysis with MAJIQ.
 
-benötigt für das preprocessing: conda, ...
-
-The rendered HTML-report can be accessed at ... .
-
-
+The generated HTML report is available at ... 
 
 ## 2 Impact of library characteristics on alternative splice analysis
 ****
