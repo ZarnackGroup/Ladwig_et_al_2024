@@ -15,7 +15,7 @@ The rendered HTML file is available at https://annikala.github.io/.
 
 ## 2 Impact of library characteristics on alternative splice analysis
 ****
-The R scripts contain the code used to investigate the influence of read length (2.1), read depth (2.2) and sample size (2.3) on: 
+The R scripts contain the code used to investigate the influence of read length (2.1a - *U2AF2* KD, 2.1b - *UPF1* KD), read depth (2.2) and replicate number (2.3) on: 
 - read alignment
 - LSV detection
 - LSV quantification
