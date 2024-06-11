@@ -31,7 +31,7 @@ library(viridis)
 probabilityThreshold = 0.9
 
 # theme
-source("C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/theme_paper.R")
+source(".../theme_paper.R")
 theme_set(theme_paper())
 ```
 
@@ -112,7 +112,7 @@ The influence of read length on LSV detection is determined by counting the LSV 
 
 ```{r}
 # load dPSI tsv files from MAJIQ Quantifier as list
-dpsiDir = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/UPF1/MAJIQ"
+dpsiDir = ".../MAJIQ_TSV_files_UPF1_KD"
 dpsiFiles=list.files(path = dpsiDir, pattern = ".tsv")
 setwd(dpsiDir)
 
@@ -148,8 +148,6 @@ nLSVs_bar = ggplot(data=nLSVs_df, aes(x = readLength, y = nLSVs, fill = readLeng
 
 nLSVs_df
 nLSVs_bar
-
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/nLSVs_UPF1.pdf", plot = nLSVs_bar, width = 3.15, height = 6, units = "cm")
 ```
 
 # 1.2 - Influence on LSV complexity (Supplementary Figure 1B)
@@ -197,7 +195,6 @@ StackedBarChart_nJunctions = ggplot(nJunctions_df, aes(x = readLength, y = Freq)
   ggtitle("B") 
 
 StackedBarChart_nJunctions
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/nJunctions_UPF1.pdf", plot = StackedBarChart_nJunctions, width = 2.95, height = 6, units = "cm")
 ```
 
 # 2 - Influence on the significance of LSVs (Supplementary Figure 2)
@@ -224,8 +221,6 @@ scatter_readLength_100 = ggplot(dPSIs[[4]], aes(x = maxDeltaPSI, y = maxProb)) +
                          geom_vline(xintercept = 0.05, col = "red3", linetype = "dashed", size = 0.62) +
                          xlab("\u0394\u03A8") 
 scatter_readLength_100
-
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/scatter_R_100L_UPF1.pdf", plot = scatter_readLength_100, width = 8, height = 5.66, units = "cm")
 ```
 ## Number and fraction of detected significant LSVs 
 
@@ -336,7 +331,7 @@ significantLSVs_all = list("36" = c(significantLSVs_36), "50" = c(significantLSV
                            "75" = c(significantLSVs_75), "100" = c(significantLSVs_100))
 
 # upset plot
-pdf(file="C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/upset_read_length_UPF1.pdf", width=3.6, height=3) 
+pdf(file=".../upset_read_length_UPF1.pdf", width=3.6, height=3) 
 upset(fromList(significantLSVs_all), 
       order.by = "freq", 
       sets.bar.color = c("#FAD8B4", "#F7B56D", "#DE872A", "#C85813"), 
@@ -402,10 +397,6 @@ ecdf_prob_changing = ggplot() +
 
 ecdf_deltaPSI
 ecdf_prob_changing
-
-# save ggplots
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/ecdf_dPSI_RL_UPF1.pdf", plot = ecdf_deltaPSI, width = 4.2, height = 4.2, units = "cm")
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/ecdf_probChanging_RL_UPF1.pdf", plot = ecdf_prob_changing, width = 4.2, height = 4.2, units = "cm")
 ```
 ## Shared binary regulation between the different datasets
 
@@ -749,8 +740,6 @@ sharedRegulation_scatterPlot6 = ggplot(data=correlationDataFrame_50_vs_36, aes(x
   ylab("\u0394\u03A8 36 nt read length") +
   theme_bw() +
   theme(plot.title = element_text(face = "bold"))
-
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/sharedRegulation_100_50_RL_UPF1.pdf", plot = sharedRegulation_scatterPlot2, width = 5.65, height = 5.65, units = "cm")
 
 sharedRegulation_scatterPlot2
 ```
