@@ -21,5 +21,7 @@ The R scripts contain the code used to investigate the influence of read length 
 - LSV quantification
 - alternative splicing event types distribution
 
+## 3 Impact of library characteristics on the detection of local splice variations in lowly expressed genes
 
+The R script '3_TPM_analysis.Rmd' contains the code for analysing the impact of read length and read depth on the detection of local splice variations in lowly expressed genes. 
 
