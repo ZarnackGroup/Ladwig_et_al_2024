@@ -24,7 +24,7 @@ library(RColorBrewer)
 library(colorspace)
 
 # theme
-source("C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/theme_paper.R")
+source(".../theme_paper.R")
 theme_set(theme_paper())
 
 # HELPER FUNCTIONS
@@ -70,6 +70,7 @@ loadFiles <- function(x){
 }
 ```
 
+
 # Load data
 
 ## Load htseq-count files
@@ -80,7 +81,7 @@ Two knockdown and two control replicate files of the U2AF2 knockdown experiment 
 
 ```{r}
 # load htseq count files for U2AF2 KD experiment (read length 100 nt)
-htseqDir_RL_100 = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/06_htseq_count/read_length/100/nonunique_all"
+htseqDir_RL_100 = ".../htseq_count_files_U2AF2_KD"
 htseqFiles_RL_100=list.files(path = htseqDir_RL_100, pattern = ".tabular")
 
 # load gene count files as data frames
@@ -112,13 +113,14 @@ mean_counts_RL_100 <- mean_counts_RL_100 %>%
   dplyr::select(-2, -3, -4, -5)
 ```
 
-### for H1 cell line und endodermal cells
+
+### For H1 cell line und endodermal cells
 
 Here all files (3 x endodermal, 3 x H1 cell line) are loaded together. There is no differentiation between 2 and 3 samples here. This only occurs when MAJIQ is used. 
 
 ```{r}
 # load htseq count files for all combinations of replicates
-htseqDir_SS = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/06_htseq_count/sample_size"
+htseqDir_SS = ".../htseq_count_files_H1_vs_endodermal"
 htseqFiles_SS=list.files(path = htseqDir_SS, pattern = ".tabular")
 htseqFiles_SS
 
@@ -155,15 +157,16 @@ mean_counts_SS <- mean_counts_SS %>%
 mean_counts_SS
 ```
 
+
 ## Load MAJIQ TSV files
 
 The endings RL and RD correspond to the TSV files with the different read length and read depths, respectively. 
 
 ```{r}
 # load dPSI TSV files from MAJIQ Quantifier as list
-dpsiDir_RL = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/U2AF2/MAJIQ/read_length"
-dpsiDir_RD = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/U2AF2/MAJIQ/read_depth"
-dpsiDir_SS = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/endodermal_cell_vs_H1_cell_line/MAJIQ"
+dpsiDir_RL = ".../MAJIQ_TSV_files_read_length"
+dpsiDir_RD = ".../MAJIQ_TSV_files_read_depth"
+dpsiDir_SS = ".../MAJIQ_TSV_files_sample_size"
 
 dpsiFiles_RL=list.files(path = dpsiDir_RL, pattern = ".tsv")
 dpsiFiles_RD=list.files(path = dpsiDir_RD, pattern = ".tsv")
@@ -207,13 +210,14 @@ not_significant_dPSIs_RD <- lapply(dPSIs_RD, filter_not_significant)
 not_significant_dPSIs_SS <- lapply(dPSIs_SS, filter_not_significant)
 ```
 
+
 # Calculate TPMs
 
 ## For U2AF2 KD experiment
 
 ```{r}
 # load annotation as gtf
-gtf <- rtracklayer::import("C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/gencode.v41.annotation.gtf", format = "gtf")
+gtf <- rtracklayer::import(".../gencode.v41.annotation.gtf", format = "gtf")
 
 db <- makeTxDbFromGRanges(gtf)
 genes <- exonsBy(db, by = "gene")
@@ -235,6 +239,7 @@ mean_counts_RL_100_2$tpm <- (mean_counts_RL_100_2$rpk / scaling_factor) * 1e6
 mean_counts_RL_100_2
 ```
 
+
 ## For H1 cell line and endodermal cells
 
 ```{r}
@@ -252,6 +257,7 @@ mean_counts_SS_2$tpm <- (mean_counts_SS_2$rpk / scaling_factor) * 1e6
 
 mean_counts_SS_2
 ```
+
 
 # Fraction of TPM bins 
 
@@ -280,6 +286,7 @@ significant_dPSIs_SS[[2]] <- merge(significant_dPSIs_SS[[2]], mean_counts_SS_2, 
 significant_dPSIs_SS[[3]] <- merge(significant_dPSIs_SS[[3]], mean_counts_SS_2, by = "gene_id")
 significant_dPSIs_SS[[4]] <- merge(significant_dPSIs_SS[[4]], mean_counts_SS_2, by = "gene_id")
 ```
+
 
 ## For each read length
 
@@ -319,10 +326,6 @@ fractionTPMs_RL <- ggplot(all_RL, aes(x = factor(read_length), fill = factor(bin
   labs(x = "read length [nt]", y = "fraction of significant LSVs [%]", title = "A", fill = "TPM") 
 
 fractionTPMs_RL
-
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/TPMs_RL.pdf", plot = fractionTPMs_RL, width = 5.15, height = 7, units = "cm")
-
-all_RL
 ```
 ```{r}
 #################################
@@ -343,6 +346,8 @@ all_RL_filtered
 all_RL_unique_genes
 genes_per_bin
 ```
+
+
 ### Transform bar plot into line plot
 
 ```{r}
@@ -362,9 +367,9 @@ fractionTPMs_RL <- ggplot(all_RL_counts, aes(x = factor(read_length), y = count,
   labs(x = "read Length [nt]", y = "number of significant LSVs", title = "A", color = "TPM")
 
 fractionTPMs_RL
-
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/TPMs_line_plot_RL.pdf", plot = fractionTPMs_RL, width = 7, height = 4.5, units = "cm")
 ```
+
+
 ## For each read depth
 
 ```{r}
@@ -411,11 +416,9 @@ fractionTPMs_RD <- ggplot(all_RD, aes(x = factor(read_depth), fill = factor(bin)
   labs(x = "read depth [10^6]", y = "fraction of significant LSVs [%]", title = "B", fill = "TPM") 
 
 fractionTPMs_RD
-
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/TPMs_RD.pdf", plot = fractionTPMs_RD, width = 6.4, height = 7, units = "cm")
 ```
-### Transform bar plot into line plot
 
+### Transform bar plot into line plot
 ```{r}
 # aggregate data to get counts for each bin and read depth
 all_RD_counts <- all_RD %>%
@@ -433,9 +436,8 @@ fractionTPMs_RD <- ggplot(all_RD_counts, aes(x = factor(read_depth), y = count, 
   labs(x = "read depth [10^6]", y = "number of significant LSVs", title = "A", color = "TPM")
 
 fractionTPMs_RD
-
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/TPMs_line_plot_RD.pdf", plot = fractionTPMs_RD, width = 8.75, height = 4.5, units = "cm")
 ```
+
 
 ## For different numbers of replicates
 
@@ -474,9 +476,9 @@ fractionTPMs_SS <- ggplot(all_SS, aes(x = factor(samples), fill = factor(bin))) 
   labs(x = "# replicates", y = "fraction of significant LSVs [%]", title = "C", fill = "TPM") 
 
 fractionTPMs_SS
-
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/TPMs_SS.pdf", plot = fractionTPMs_SS, width = 4.55, height = 7, units = "cm")
 ```
+
+
 ### Transform bar plot into line plot
 
 ```{r}
