@@ -1,6 +1,6 @@
 # How to choose the optimal RNA-Seq library characteristics for alternative splicing analysis (with MAJIQ)
 ****
-This Github repository provides the code the for the publication Ladwig et al. 2023.
+This Github repository provides the code the for the publication Ladwig et al. 2024.
 
 ## Authors
 - Annika Ladwig
