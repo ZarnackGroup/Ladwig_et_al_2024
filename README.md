@@ -1,6 +1,11 @@
-# Impact of RNASeq read depth and read length on alternative splicing analysis
+# How to choose the optimal RNA-Seq library characteristics for alternative splicing analysis (with MAJIQ)
 ****
 This Github repository provides the code the for the publication Ladwig et al. 2023.
+
+## Authors
+- Annika Ladwig
+- Melina Klostermann
+- Kathi Zarnack
 
 ## 1 Preprocessing and alternative splicing analysis with MAJIQ
 ****
