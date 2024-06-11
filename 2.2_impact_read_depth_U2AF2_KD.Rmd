@@ -1,5 +1,5 @@
 ---
-title: "MAJIQ analysis read depth"
+title: "Impact of read depth on alternative splicing analysis (U2AF2 KD)"
 author: "Annika Ladwig"
 output:
   prettydoc::html_pretty:
@@ -28,7 +28,7 @@ library(ggforce)
 probabilityThreshold = 0.9
 
 # MY THEME
-source("C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/theme_paper.R")
+source(".../theme_paper.R")
 theme_set(theme_paper())
 
 # MY FUNCTIONS
