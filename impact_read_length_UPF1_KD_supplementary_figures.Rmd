@@ -1,0 +1,762 @@
+---
+title: "Impact of read length on alternative splicing analysis (UPF1 KD)"
+author: "Annika Ladwig"
+output:
+  prettydoc::html_pretty:
+    theme: architect
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE,
+                      results=TRUE, crop=NULL)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(ggpubr)
+library("RColorBrewer")
+library("ggVennDiagram")
+library("wesanderson")
+library("colorspace")
+library(UpSetR)
+library(ggforce)
+library(ggpointdensity)
+library(viridis)
+```
+
+```{r}
+# parameters
+probabilityThreshold = 0.9
+
+# theme
+source("C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/theme_paper.R")
+theme_set(theme_paper())
+```
+
+```{r}
+###################
+# defined functions
+###################
+
+# function to extract relevant rows and columns
+createTable <- function(file) {
+  file = file[-1] %>%
+    slice(7, 24, 27, 29, 31) %>%
+    rename(n = 1)
+  file = cbind(Reads = c("01 uniquely mapped", "02 multiple mapped", 
+                         "03 unmapped 1", "04 unmapped 2", "05 unmapped 3"), file)
+  file[nrow(file) + 1,] = c("03 unmapped", sum(c(as.numeric(file[3:5, 2]))))
+  file = file %>% slice(1, 2, 6)
+}
+
+# function to load files as data frames
+loadFiles <- function(x){
+  x = read.table(file = x,
+                 header = TRUE,
+                 sep = "\t",
+                 stringsAsFactors = FALSE)
+}
+
+# function to count semicolons of column "mean_dpsi_per_lsv_junction"
+# to find out the number of junctions per LSV
+# & store this information in new column "nJunctions"
+countJunctions <- function(x) {
+  SRSF6_junctionsPerLSV = x$mean_dpsi_per_lsv_junction %>%
+   str_count(pattern = ";") + 1
+  x$nJunctions = SRSF6_junctionsPerLSV
+  x
+}
+
+# count the amount of LSVs with 2, 3, 4, ... junctions
+# create data frame with this information
+complexityLSVs <- function(x) {
+   junctionsPerLSV = x$nJunctions %>%
+    table(dnn="junctionsPerLSV") %>%
+    as.data.frame
+   junctionsPerLSV
+}
+
+# function to extract max. dPSI for each LSV and add new column with this information
+extractMaxDPSIs <- function(x) {
+  maxDeltaPSIs = x$mean_dpsi_per_lsv_junction %>%
+    str_split(pattern = ";") %>%
+    sapply(FUN = function(dPSIs){
+      return(
+        dPSIs %>% as.numeric %>% abs %>% max
+      )
+    })
+  x$maxDeltaPSI = maxDeltaPSIs
+  x
+}
+
+# function to extract max. probability for each LSV and add new column with this information
+extractMaxProbs <- function(x) {
+  maxProbs = x$probability_changing %>%
+    str_split(pattern=";") %>%
+    sapply(FUN=function(probs){
+      return(
+        probs %>% as.numeric %>% max
+      )
+    })
+  x$maxProb = maxProbs
+  x
+}
+```
+
+
+# 1.1 - Influence on LSV detection (Supplementary Figure 1A)
+
+The influence of read length on LSV detection is determined by counting the LSV hits (rows) in the tsv files received from MAJIQ for each read length. 
+
+```{r}
+# load dPSI tsv files from MAJIQ Quantifier as list
+dpsiDir = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/UPF1/MAJIQ"
+dpsiFiles=list.files(path = dpsiDir, pattern = ".tsv")
+setwd(dpsiDir)
+
+# load tsv files as data frames
+dPSIs = lapply(dpsiFiles, loadFiles)
+dPSIs
+```
+
+```{r}
+# count detected LSVs
+nLSVs_readLength_36 = nrow(dPSIs[[1]])
+nLSVs_readLength_50 = nrow(dPSIs[[2]])
+nLSVs_readLength_75 = nrow(dPSIs[[3]])
+nLSVs_readLength_100 = nrow(dPSIs[[4]])
+
+# create dataframe with nLSVs 
+nLSVs_df = data.frame(readLength=c("036", "050", "075", "100"),
+                      nLSVs=c(nLSVs_readLength_36, nLSVs_readLength_50, 
+                              nLSVs_readLength_75, nLSVs_readLength_100))
+
+# number of LSVs bar chart
+nLSVs_bar = ggplot(data=nLSVs_df, aes(x = readLength, y = nLSVs, fill = readLength)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  ylim(0, 57000) +
+  xlab("read length [nt]") +
+  ylab("# LSVs") +
+  ggtitle("A") +
+  scale_fill_manual(name = "read length [nt]", 
+                    values = c("#FAD8B4", "#F7B56D", "#DE872A", "#C85813"),  
+                    labels = c("36", "50", "75", "100")) +
+  scale_x_discrete(labels = c("36", "50", "75", "100")) +
+  geom_text(aes(label=nLSVs), position=position_dodge(width=0.9), vjust=-0.25) 
+
+nLSVs_df
+nLSVs_bar
+
+ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/nLSVs_UPF1.pdf", plot = nLSVs_bar, width = 3.15, height = 6, units = "cm")
+```
+
+# 1.2 - Influence on LSV complexity (Supplementary Figure 1B)
+
+The LSV complexity describes how many junctions an LSV has. To measure the influence on this, the LSVs with 2, 3, 4 or more than 4 junctions are counted for each read length. 
+
+```{r}
+# count junctions of each LSV
+# create new list with the data frames that contain the information about the complexity of the LSVs
+dPSIs = lapply(dPSIs, countJunctions)
+complexityLSVs = lapply(dPSIs, complexityLSVs)
+
+# add new column with read length to differ the data 
+# when merging the single data frames to one 
+complexityLSVs[[1]]$readLength = "036"
+complexityLSVs[[2]]$readLength = "050"
+complexityLSVs[[3]]$readLength = "075"
+complexityLSVs[[4]]$readLength = "100"
+
+# create data frame out of all read length to build a stacked bar chart
+nJunctions_df <- rbind(complexityLSVs[[1]], complexityLSVs[[2]], complexityLSVs[[3]], complexityLSVs[[4]])
+
+# all LSVs with junctions > 4 are grouped into one category
+# -> all LSVs with > 4 junctions get the same color in following stacked bar chart
+for (i in 1:nrow(nJunctions_df)){
+  if (as.integer(nJunctions_df[i, "junctionsPerLSV"]) >= 5) {
+    nJunctions_df[i, "junctionsPerLSV"] = 5
+  }
+}
+
+# stacked bar chart to show complexity of LSVs for each read length
+StackedBarChart_nJunctions = ggplot(nJunctions_df, aes(x = readLength, y = Freq)) +
+  geom_bar(stat = "identity", aes(fill = readLength), position = "fill", show.legend = FALSE) +
+  scale_fill_manual(values = c("#FAD8B4", "#F7B56D", "#DE872A", "#C85813"),
+                    labels = c("36", "50", "75", "100"),
+                    name = "read length [nt]") + 
+  geom_bar(stat = "identity", fill = "black", aes(alpha = junctionsPerLSV), position = "fill", show.legend = FALSE) +
+  scale_alpha_manual(values = c(0, 0.3, 0.55, 0.8),
+                     name = "junctions per LSV", 
+                     breaks = c("2", "3", "4", "5"),
+                     labels = c("2", "3", "4", "> 4")) +
+  scale_x_discrete(labels = c("36", "50", "75", "100")) +
+  xlab("read length [nt]") +
+  ylab("fraction LSVs [%]") +
+  ggtitle("B") 
+
+StackedBarChart_nJunctions
+ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/nJunctions_UPF1.pdf", plot = StackedBarChart_nJunctions, width = 2.95, height = 6, units = "cm")
+```
+
+# 2 - Influence on the significance of LSVs (Supplementary Figure 2)
+
+Influence of read length on the significance of LSVs is determined by plotting the fraction of significantly regulated LSVs detected for each read length. LSVs are considered significant if dPSI is at least 0.05 and probability changing is at least 0.9. 
+
+For each LSV, the maximum dpsi and max probability changing is chosen. These usually belong to the same junction.
+
+```{r}
+# extract max. dPSI for each LSV and add new column with this information
+dPSIs = lapply(dPSIs, extractMaxDPSIs)
+
+# extract max. probability for each LSV and add a new column with this information
+dPSIs = lapply(dPSIs, extractMaxProbs)
+```
+
+## dPSI against probability changing (Supplementary Figure 2A)
+
+```{r}
+# plot max. dPSI against max. probability for each LSV (100 nt long reads)
+scatter_readLength_100 = ggplot(dPSIs[[4]], aes(x = maxDeltaPSI, y = maxProb)) + geom_pointdensity() +
+                         scale_color_viridis(option = "rocket") +
+                         geom_hline(yintercept = probabilityThreshold, col = "red3", linetype = "dashed", size = 0.62) +
+                         geom_vline(xintercept = 0.05, col = "red3", linetype = "dashed", size = 0.62) +
+                         xlab("\u0394\u03A8") 
+scatter_readLength_100
+
+ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/scatter_R_100L_UPF1.pdf", plot = scatter_readLength_100, width = 8, height = 5.66, units = "cm")
+```
+## Number and fraction of detected significant LSVs 
+
+```{r}
+# add new column "significant" for each read length which could be TRUE/FALSE 
+# TRUE if maxProb >= 0.9 and maxDPSI >= 0.05 (significance threshold)
+dPSIs[[1]]$significant = dPSIs[[1]]$maxProb >= probabilityThreshold & dPSIs[[1]]$maxDeltaPSI >= 0.05
+dPSIs[[2]]$significant = dPSIs[[2]]$maxProb >= probabilityThreshold & dPSIs[[2]]$maxDeltaPSI >= 0.05
+dPSIs[[3]]$significant = dPSIs[[3]]$maxProb >= probabilityThreshold & dPSIs[[3]]$maxDeltaPSI >= 0.05
+dPSIs[[4]]$significant = dPSIs[[4]]$maxProb >= probabilityThreshold & dPSIs[[4]]$maxDeltaPSI >= 0.05
+
+# significant LSVs for each read length
+print("# significant LSVs")
+table(dPSIs[[1]]$significant)
+table(dPSIs[[2]]$significant)
+table(dPSIs[[3]]$significant)
+table(dPSIs[[4]]$significant)
+
+# count significant and not significant LSVs for each read length
+nSignificant_36 = sum(dPSIs[[1]]$significant)
+nNotSignificant_36 = (nLSVs_readLength_36-sum(dPSIs[[1]]$significant))
+nSignificant_50 = sum(dPSIs[[2]]$significant)
+nNotSignificant_50 = (nLSVs_readLength_50-sum(dPSIs[[2]]$significant))
+nSignificant_75 = sum(dPSIs[[3]]$significant)
+nNotSignificant_75 = (nLSVs_readLength_75-sum(dPSIs[[3]]$significant))
+nSignificant_100 = sum(dPSIs[[4]]$significant)
+nNotSignificant_100 = (nLSVs_readLength_100-sum(dPSIs[[4]]$significant))
+
+#############################
+# number of significant LSVs
+#############################
+
+# dataframe with number of significantly regulated LSVs
+nSignificantLSVs_df_absolute = data.frame(readLength=c("036", "050", "075", "100"),
+                      nSignificantLSVs=c(nSignificant_36, nSignificant_50, nSignificant_75, nSignificant_100))
+
+# number of signifciant LSVs bar chart
+nSignificantLSVs_bar_absolute = 
+  ggplot(data=nSignificantLSVs_df_absolute, aes(x = readLength, y = nSignificantLSVs, fill = readLength)) +
+  geom_bar(stat = "identity") +
+  xlab("read length [nt]") +
+  ylab("# significant LSVs") +
+  scale_fill_manual(name = "read length [nt]", values = c("#FAD8B4", "#F7B56D", "#DE872A", "#C85813"), 
+                    labels = c("36", "50", "75", "100")) +
+  scale_x_discrete(labels = c("36", "50", "75", "100")) +
+  geom_text(aes(label=nSignificantLSVs), position=position_dodge(width=0.9), vjust=1) 
+
+###############################
+# fraction significant LSVs
+###############################
+
+# create data frame with a column for the read length
+# and a column indicating whether the associated LSV is significant or not 
+significantLSVs_df_relative = data.frame(comparison=c(rep("036", nrow(dPSIs[[1]])),
+                                                   rep("050", nrow(dPSIs[[2]])), 
+                                                   rep("075", nrow(dPSIs[[3]])), 
+                                                   rep("100", nrow(dPSIs[[4]]))),
+                                      significant=c(dPSIs[[1]]$significant,
+                                                    dPSIs[[2]]$significant, 
+                                                    dPSIs[[3]]$significant, 
+                                                    dPSIs[[4]]$significant))
+
+# differ between the significance of LSVs of different sample combinations to plot them in different colors 
+for (i in 1:nrow(significantLSVs_df_relative)){
+  if (significantLSVs_df_relative[i, "comparison"] == "036" && significantLSVs_df_relative[i, "significant"] == TRUE){
+    significantLSVs_df_relative[i, "significant"] = "TRUE read length 036"
+  }
+  if (significantLSVs_df_relative[i, "comparison"] == "050" && significantLSVs_df_relative[i, "significant"] == TRUE){
+    significantLSVs_df_relative[i, "significant"] = "TRUE read length 050"
+  }
+  if (significantLSVs_df_relative[i, "comparison"] == "075" && significantLSVs_df_relative[i, "significant"] == TRUE){
+    significantLSVs_df_relative[i, "significant"] = "TRUE read length 075"
+  }
+  if (significantLSVs_df_relative[i, "comparison"] == "100" && significantLSVs_df_relative[i, "significant"] == TRUE){
+    significantLSVs_df_relative[i, "significant"] = "TRUE read length 100"
+  }
+}
+
+# stacked bar chart showing fraction of significant LSVs among all LSVs for each read length   
+nSignificantLSVs_bar_relative = ggplot(data=significantLSVs_df_relative, aes(x = comparison, fill = factor(significant))) +
+  geom_bar(position = "fill", show.legend = FALSE) +
+  xlab("read length [nt]") +
+  ylab("fraction LSVs [%]") +
+  coord_cartesian(ylim = c(0, 0.07)) +
+  scale_fill_manual(name= "significant", values = c("lightgrey", "#FAD8B4", "#F7B56D", "#DE872A", "#C85813"), labels = c("FALSE", "TRUE", "TRUE", "TRUE", "TRUE")) +
+  scale_x_discrete(labels = c("36", "50", "75", "100")) 
+
+nSignificantLSVs_bar_relative
+```
+## Shared significant LSVs between different datasets (Supplementary Figure 2B)
+
+```{r}
+# check number of regulated LSVs
+# TRUE = 1, FALSE = 0
+sum(dPSIs[[1]]$significant)
+sum(dPSIs[[2]]$significant)
+sum(dPSIs[[3]]$significant)
+sum(dPSIs[[4]]$significant)
+
+# extract all significant LSVs for each read length
+significantLSVs_36 = dPSIs[[1]]$lsv_id[dPSIs[[1]]$significant == TRUE]
+significantLSVs_50 = dPSIs[[2]]$lsv_id[dPSIs[[2]]$significant == TRUE]
+significantLSVs_75 = dPSIs[[3]]$lsv_id[dPSIs[[3]]$significant == TRUE]
+significantLSVs_100 = dPSIs[[4]]$lsv_id[dPSIs[[4]]$significant == TRUE]
+
+# list with all significant LSVs for each read length
+significantLSVs_all = list("36" = c(significantLSVs_36), "50" = c(significantLSVs_50), 
+                           "75" = c(significantLSVs_75), "100" = c(significantLSVs_100))
+
+# upset plot
+pdf(file="C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/upset_read_length_UPF1.pdf", width=3.6, height=3) 
+upset(fromList(significantLSVs_all), 
+      order.by = "freq", 
+      sets.bar.color = c("#FAD8B4", "#F7B56D", "#DE872A", "#C85813"), 
+      sets.x.label = "# significant LSVs", 
+      mainbar.y.label = "intersection")
+dev.off()
+```
+# 3 - Influence on size of detected splicing changes (Supplementary Figure 3)
+
+Influence on the size of detected splicing changes is determined by plotting the cumulative fraction of dPSIs and probability changing values for each read length. 
+
+```{r}
+dPSIs[[1]]$readLength = "036"
+dPSIs[[2]]$readLength = "50"
+dPSIs[[3]]$readLength = "75"
+dPSIs[[4]]$readLength = "100"
+
+# cumulative fraction of dPSIs
+ecdf_deltaPSI = ggplot() +
+  stat_ecdf(aes(x = maxDeltaPSI), color = "black", data = dPSIs[[1]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxDeltaPSI, color = "036"), data = dPSIs[[1]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxDeltaPSI), color = "black", data = dPSIs[[2]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxDeltaPSI, color = "050"), data = dPSIs[[2]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxDeltaPSI), color = "black", data = dPSIs[[3]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxDeltaPSI, color = "075"), data = dPSIs[[3]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxDeltaPSI), color = "black", data = dPSIs[[4]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxDeltaPSI, color = "100"), data = dPSIs[[4]], size = 1, pad = FALSE) +
+  scale_color_manual(values = c("#FAD8B4", "#FFB565", "#DE872A", "#C85813"), 
+                     name = "read length  [nt]", 
+                     labels = c("36", "50", "75", "100", "36", "50", "75", "100")) + 
+  geom_vline(xintercept = 0.05, col = "red3", linetype = "dashed", size = 0.5) +
+  coord_cartesian(xlim=c(0, 0.5)) +
+  ylab("cumulative fraction") +
+  xlab("dPSI") +
+  ggtitle("A") +
+  theme(legend.position="none") 
+  
+
+# cumulative fraction of probability changing values 
+ecdf_prob_changing = ggplot() +
+  stat_ecdf(aes(x = maxProb), color = "black", data = dPSIs[[1]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxProb, color = readLength), data = dPSIs[[1]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxProb), color = "black", data = dPSIs[[2]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxProb, color = readLength), data = dPSIs[[2]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxProb), color = "black", data = dPSIs[[3]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxProb, color = readLength), data = dPSIs[[3]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxProb), color = "black", data = dPSIs[[4]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxProb, color = readLength), data = dPSIs[[4]], size = 1, pad = FALSE) +
+  scale_color_manual(name = "read length  [nt]", values = c("#FAD8B4", "#FFB565", "#DE872A", "#C85813"), 
+                     labels = c("36", "50", "75", "100")) + 
+  geom_vline(xintercept = 0.9, col = "red3", linetype = "dashed", size = 0.5) +
+  xlim(0, 1) +
+  ylab("cumulative fraction") +
+  xlab("P(|dPSI| > 0.05)") +
+  ggtitle("A") +
+  theme(legend.position="none")
+
+ecdf_deltaPSI
+ecdf_prob_changing
+
+# save ggplots
+ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/ecdf_dPSI_RL_UPF1.pdf", plot = ecdf_deltaPSI, width = 4.2, height = 4.2, units = "cm")
+ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/ecdf_probChanging_RL_UPF1.pdf", plot = ecdf_prob_changing, width = 4.2, height = 4.2, units = "cm")
+```
+## Shared binary regulation between the different datasets
+
+Only binary LSVs are considered to ensure that the dPSI value of the same junction is taken from both data sets. 
+
+```{r}
+#################
+# all binary LSVs
+#################
+
+# filter the data frames for LSVs with 2 Junctions
+# significance shown
+U2AF2_100_filtered = dPSIs[[4]][dPSIs[[4]]$nJunctions == 2,]
+U2AF2_75_filtered = dPSIs[[3]][dPSIs[[3]]$nJunctions == 2,]
+U2AF2_50_filtered = dPSIs[[2]][dPSIs[[2]]$nJunctions == 2,]
+U2AF2_36_filtered = dPSIs[[1]][dPSIs[[1]]$nJunctions == 2,]
+
+# identify shared significant LSVs for each comparison
+# extract LSV IDs that intersect
+shared_U2AF2_100_75 = intersect(U2AF2_100_filtered$lsv_id, U2AF2_75_filtered$lsv_id) 
+length(shared_U2AF2_100_75)
+shared_U2AF2_100_50 = intersect(U2AF2_100_filtered$lsv_id, U2AF2_50_filtered$lsv_id) 
+length(shared_U2AF2_100_50)
+shared_U2AF2_100_36 = intersect(U2AF2_100_filtered$lsv_id, U2AF2_36_filtered$lsv_id)
+length(shared_U2AF2_100_36)
+shared_U2AF2_75_50 = intersect(U2AF2_75_filtered$lsv_id, U2AF2_50_filtered$lsv_id)
+length(shared_U2AF2_75_50)
+shared_U2AF2_75_36 = intersect(U2AF2_75_filtered$lsv_id, U2AF2_36_filtered$lsv_id)
+length(shared_U2AF2_75_36)
+shared_U2AF2_50_36 = intersect(U2AF2_50_filtered$lsv_id, U2AF2_36_filtered$lsv_id)
+length(shared_U2AF2_50_36)
+
+# extract filtered LSVs from data frames above
+# compare 100 with 75
+U2AF2_100_filtered_match_75 <- U2AF2_100_filtered[match(shared_U2AF2_100_75, U2AF2_100_filtered$lsv_id),]
+U2AF2_75_filtered_match_100 <- U2AF2_75_filtered[match(shared_U2AF2_100_75, U2AF2_75_filtered$lsv_id),]
+
+# compare 100 with 50
+U2AF2_100_filtered_match_50 <- U2AF2_100_filtered[match(shared_U2AF2_100_50, U2AF2_100_filtered$lsv_id),]
+U2AF2_50_filtered_match_100 <- U2AF2_50_filtered[match(shared_U2AF2_100_50, U2AF2_50_filtered$lsv_id),]
+
+# compare 100 with 36
+U2AF2_100_filtered_match_36 <- U2AF2_100_filtered[match(shared_U2AF2_100_36, U2AF2_100_filtered$lsv_id),]
+U2AF2_36_filtered_match_100 <- U2AF2_36_filtered[match(shared_U2AF2_100_36, U2AF2_36_filtered$lsv_id),]
+
+# compare 75 with 50
+U2AF2_75_filtered_match_50 <- U2AF2_75_filtered[match(shared_U2AF2_75_50, U2AF2_75_filtered$lsv_id),]
+U2AF2_50_filtered_match_75 <- U2AF2_50_filtered[match(shared_U2AF2_75_50, U2AF2_50_filtered$lsv_id),]
+
+# compare 75 with 36
+U2AF2_75_filtered_match_36 <- U2AF2_75_filtered[match(shared_U2AF2_75_36, U2AF2_75_filtered$lsv_id),]
+U2AF2_36_filtered_match_75 <- U2AF2_36_filtered[match(shared_U2AF2_75_36, U2AF2_36_filtered$lsv_id),]
+
+# compare 50 with 36
+U2AF2_50_filtered_match_36 <- U2AF2_50_filtered[match(shared_U2AF2_50_36, U2AF2_50_filtered$lsv_id),]
+U2AF2_36_filtered_match_50 <- U2AF2_36_filtered[match(shared_U2AF2_50_36, U2AF2_36_filtered$lsv_id),]
+
+# extract dPSI value of the first junction for all LSVs
+# deltapsi 100 vs 75 
+deltaPSI_100_vs_75 = U2AF2_100_filtered_match_75$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+deltaPSI_75_vs_100 = U2AF2_75_filtered_match_100$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 100 vs 50 
+deltaPSI_100_vs_50 = U2AF2_100_filtered_match_50$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+deltaPSI_50_vs_100 = U2AF2_50_filtered_match_100$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 100 vs 36 
+deltaPSI_100_vs_36 = U2AF2_100_filtered_match_36$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_36_vs_100 = U2AF2_36_filtered_match_100$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 75 vs 50
+deltaPSI_75_vs_50 = U2AF2_75_filtered_match_50$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_50_vs_75 = U2AF2_50_filtered_match_75$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 75 vs 36
+deltaPSI_75_vs_36 = U2AF2_75_filtered_match_36$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_36_vs_75 = U2AF2_36_filtered_match_75$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 50 vs 36
+deltaPSI_50_vs_36 = U2AF2_50_filtered_match_36$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_36_vs_50 = U2AF2_36_filtered_match_50$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+
+##########################
+# significant binary LSVs
+##########################
+
+# filter the data frames for significant LSVs with 2 Junctions
+U2AF2_100_filtered_sig = dPSIs[[4]][dPSIs[[4]]$nJunctions == 2 & dPSIs[[4]]$significant == TRUE,]
+U2AF2_75_filtered_sig = dPSIs[[3]][dPSIs[[3]]$nJunctions == 2 & dPSIs[[3]]$significant == TRUE,]
+U2AF2_50_filtered_sig = dPSIs[[2]][dPSIs[[2]]$nJunctions == 2 & dPSIs[[2]]$significant == TRUE,]
+U2AF2_36_filtered_sig = dPSIs[[1]][dPSIs[[1]]$nJunctions == 2 & dPSIs[[1]]$significant == TRUE,]
+
+# identify shared significant LSVs for each comparison
+shared_U2AF2_100_U2AF2_75_sig = intersect(U2AF2_100_filtered_sig$lsv_id, U2AF2_75_filtered_sig$lsv_id) 
+length(shared_U2AF2_100_U2AF2_75_sig)
+shared_U2AF2_100_U2AF2_50_sig = intersect(U2AF2_100_filtered_sig$lsv_id, U2AF2_50_filtered_sig$lsv_id) 
+length(shared_U2AF2_100_U2AF2_50_sig)
+shared_U2AF2_100_U2AF2_36_sig = intersect(U2AF2_100_filtered_sig$lsv_id, U2AF2_36_filtered_sig$lsv_id)
+length(shared_U2AF2_100_U2AF2_36_sig)
+shared_U2AF2_75_U2AF2_50_sig = intersect(U2AF2_75_filtered_sig$lsv_id, U2AF2_50_filtered_sig$lsv_id)
+length(shared_U2AF2_75_U2AF2_50_sig)
+shared_U2AF2_75_U2AF2_36_sig = intersect(U2AF2_75_filtered_sig$lsv_id, U2AF2_36_filtered_sig$lsv_id)
+length(shared_U2AF2_75_U2AF2_36_sig)
+shared_U2AF2_50_U2AF2_36_sig = intersect(U2AF2_50_filtered_sig$lsv_id, U2AF2_36_filtered_sig$lsv_id)
+length(shared_U2AF2_50_U2AF2_36_sig)
+
+# extract filtered LSVs from data frames above
+# compare 100 with 75
+U2AF2_100_filtered_match_U2AF2_75_sig <- U2AF2_100_filtered_sig[match(shared_U2AF2_100_U2AF2_75_sig, U2AF2_100_filtered_sig$lsv_id),]
+
+U2AF2_75_filtered_match_U2AF2_100_sig <- U2AF2_75_filtered_sig[match(shared_U2AF2_100_U2AF2_75_sig, U2AF2_75_filtered_sig$lsv_id),]
+
+# compare 100 with 50
+U2AF2_100_filtered_match_U2AF2_50_sig <- U2AF2_100_filtered_sig[match(shared_U2AF2_100_U2AF2_50_sig, U2AF2_100_filtered_sig$lsv_id),]
+
+U2AF2_50_filtered_match_U2AF2_100_sig <- U2AF2_50_filtered_sig[match(shared_U2AF2_100_U2AF2_50_sig, U2AF2_50_filtered_sig$lsv_id),]
+
+# compare 100 with 36
+U2AF2_100_filtered_match_U2AF2_36_sig <- U2AF2_100_filtered_sig[match(shared_U2AF2_100_U2AF2_36_sig, U2AF2_100_filtered_sig$lsv_id),]
+
+U2AF2_36_filtered_match_U2AF2_100_sig <- U2AF2_36_filtered_sig[match(shared_U2AF2_100_U2AF2_36_sig, U2AF2_36_filtered_sig$lsv_id),]
+
+# compare 75 with 50
+U2AF2_75_filtered_match_U2AF2_50_sig <- U2AF2_75_filtered_sig[match(shared_U2AF2_75_U2AF2_50_sig, U2AF2_75_filtered_sig$lsv_id),]
+
+U2AF2_50_filtered_match_U2AF2_75_sig <- U2AF2_50_filtered_sig[match(shared_U2AF2_75_U2AF2_50_sig, U2AF2_50_filtered_sig$lsv_id),]
+
+# compare 75 with 36
+U2AF2_75_filtered_match_U2AF2_36_sig <- U2AF2_75_filtered_sig[match(shared_U2AF2_75_U2AF2_36_sig, U2AF2_75_filtered_sig$lsv_id),]
+
+U2AF2_36_filtered_match_U2AF2_75_sig <- U2AF2_36_filtered_sig[match(shared_U2AF2_75_U2AF2_36_sig, U2AF2_36_filtered_sig$lsv_id),]
+
+# compare 50 with 36
+U2AF2_50_filtered_match_U2AF2_36_sig <- U2AF2_50_filtered_sig[match(shared_U2AF2_50_U2AF2_36_sig, U2AF2_50_filtered_sig$lsv_id),]
+
+U2AF2_36_filtered_match_U2AF2_50_sig <- U2AF2_36_filtered_sig[match(shared_U2AF2_50_U2AF2_36_sig, U2AF2_36_filtered_sig$lsv_id),]
+
+# extract dPSI value of the first junction for all LSVs
+# deltapsi 100 vs 75 
+deltaPSI_100_vs_75_sig = U2AF2_100_filtered_match_U2AF2_75_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+deltaPSI_75_vs_100_sig = U2AF2_75_filtered_match_U2AF2_100_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 100 vs 50 
+deltaPSI_100_vs_50_sig = U2AF2_100_filtered_match_U2AF2_50_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+deltaPSI_50_vs_100_sig = U2AF2_50_filtered_match_U2AF2_100_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 100 vs 36 
+deltaPSI_100_vs_36_sig = U2AF2_100_filtered_match_U2AF2_36_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_36_vs_100_sig = U2AF2_36_filtered_match_U2AF2_100_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 75 vs 50
+deltaPSI_75_vs_50_sig = U2AF2_75_filtered_match_U2AF2_50_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_50_vs_75_sig = U2AF2_50_filtered_match_U2AF2_75_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 75 vs 36
+deltaPSI_75_vs_36_sig = U2AF2_75_filtered_match_U2AF2_36_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_36_vs_75_sig = U2AF2_36_filtered_match_U2AF2_75_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 50 vs 36
+deltaPSI_50_vs_36_sig = U2AF2_50_filtered_match_U2AF2_36_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_36_vs_50_sig = U2AF2_36_filtered_match_U2AF2_50_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+```
+```{r}
+# build data frame out of vectors with dPSI values 
+# create scatter plot with the data frames
+
+# correlation data frame 100 vs 75
+correlationDataFrame_100_vs_75 <- data.frame(deltaPSI_100_vs_75, deltaPSI_75_vs_100)
+correlationDataFrame_100_vs_75_sig <- data.frame(deltaPSI_100_vs_75_sig, deltaPSI_75_vs_100_sig)
+
+sharedRegulation_scatterPlot1 = ggplot(data=correlationDataFrame_100_vs_75, aes(x=deltaPSI_100_vs_75, deltaPSI_U2AF2_75_vs_100)) +
+  stat_cor(label.x.npc = .3, label.y.npc =1) +
+  ggrastr::geom_point_rast(alpha=0.36, color="darkgrey", size=0.3) +
+  geom_smooth(data=correlationDataFrame_100_vs_75, aes(x=deltaPSI_100_vs_75, deltaPSI_75_vs_100), method = "lm", color="darkgrey", se=FALSE) +
+  ggrastr::geom_point_rast(data=correlationDataFrame_100_vs_75_sig, aes(x=deltaPSI_100_vs_75_sig, y=deltaPSI_75_vs_100_sig), color="black", size=0.3) +
+  geom_smooth(data=correlationDataFrame_100_vs_75_sig, aes(x=deltaPSI_100_vs_75_sig, y=deltaPSI_75_vs_100_sig),method = "lm", color="black", se=FALSE) +
+  geom_hline(yintercept=0, size=.5, linetype="dashed") +
+  geom_vline(xintercept=0, size=.5, linetype="dashed") +
+  coord_cartesian(xlim = c(-0.8, 0.8), ylim = c(-0.8, 0.8)) +
+  coord_fixed(ratio = 1) +
+  geom_abline(xintercept=0, slope=1, linetype="dashed", size=.75, color="firebrick2") +
+  xlab("dPSI 100 nt read length") +
+  ylab("dPSI 75 nt read length") +
+  theme_bw() +
+  theme(plot.title = element_text(face = "bold"))
+
+# correlation data frame 100 vs 50
+correlationDataFrame_100_vs_50 <- data.frame(deltaPSI_100_vs_50, deltaPSI_50_vs_100)
+correlationDataFrame_100_vs_50_sig <- data.frame(deltaPSI_100_vs_50_sig, deltaPSI_50_vs_100_sig)
+
+sharedRegulation_scatterPlot2 = ggplot(data=correlationDataFrame_100_vs_50, aes(x=deltaPSI_100_vs_50, deltaPSI_50_vs_100)) +
+  stat_cor(label.x.npc = .3, label.y.npc =1) +
+  ggrastr::geom_point_rast(alpha=0.36, color="#979797", size=0.25) +
+  geom_smooth(data=correlationDataFrame_100_vs_50, aes(x=deltaPSI_100_vs_50, deltaPSI_50_vs_100), method = "lm", color="darkgrey", se=FALSE) +
+  ggrastr::geom_point_rast(data=correlationDataFrame_100_vs_50_sig, aes(x=deltaPSI_100_vs_50_sig, y=deltaPSI_50_vs_100_sig), color="black", size=0.25) +
+  geom_smooth(data=correlationDataFrame_100_vs_50_sig, aes(x=deltaPSI_100_vs_50_sig, y=deltaPSI_50_vs_100_sig),method = "lm", color="black", se=FALSE) +
+  geom_hline(yintercept=0, size=.5, linetype="dashed") +
+  geom_vline(xintercept=0, size=.5, linetype="dashed") + 
+  geom_abline(xintercept=0, slope=1, linetype="dashed", size=.75, color="black") +
+  coord_cartesian(xlim = c(-1, 1), ylim = c(-1, 1)) +
+  xlab("dPSI 100 nt read length") +
+  ylab("dPSI 50 nt read length") +
+  theme_bw() +
+  theme(plot.title = element_text(face = "bold")) +
+  theme(aspect.ratio=1) +
+  ggtitle("D")
+
+# correlation data frame 100 vs 36
+correlationDataFrame_100_vs_36 <- data.frame(deltaPSI_100_vs_36, deltaPSI_36_vs_100)
+correlationDataFrame_100_vs_36_sig <- data.frame(deltaPSI_100_vs_36_sig, deltaPSI_36_vs_100_sig)
+
+sharedRegulation_scatterPlot3 = ggplot(data=correlationDataFrame_100_vs_36, aes(x=deltaPSI_100_vs_36, deltaPSI_36_vs_100)) +
+  stat_cor(label.x.npc = .3, label.y.npc =1) +
+  ggrastr::geom_point_rast(alpha=0.36, color="darkgrey", size=0.3) +
+  geom_smooth(data=correlationDataFrame_100_vs_36, aes(x=deltaPSI_100_vs_36, deltaPSI_36_vs_100), method = "lm", color="darkgrey", se=FALSE) +
+  ggrastr::geom_point_rast(data=correlationDataFrame_100_vs_36_sig, aes(x=deltaPSI_100_vs_36_sig, y=deltaPSI_36_vs_100_sig), color="black", size=0.3) +
+  geom_smooth(data=correlationDataFrame_100_vs_36_sig, aes(x=deltaPSI_100_vs_36_sig, y=deltaPSI_36_vs_100_sig),method = "lm", color="black", se=FALSE) +
+  geom_hline(yintercept=0, size=.5, linetype="dashed") +
+  geom_vline(xintercept=0, size=.5, linetype="dashed") +
+  geom_abline(xintercept=0, slope=1, linetype="dashed", size=.75, color="firebrick2") +
+  coord_fixed(ratio = 1) +
+  xlab("dPSI 100 nt read length") +
+  ylab("dPSI 50 nt read length") +
+  theme_bw() +
+  theme(plot.title = element_text(face = "bold"))
+
+# correlation data frame 75 vs 50
+correlationDataFrame_75_vs_50 <- data.frame(deltaPSI_75_vs_50, deltaPSI_50_vs_75)
+correlationDataFrame_75_vs_50_sig <- data.frame(deltaPSI_75_vs_50_sig, deltaPSI_50_vs_75_sig)
+
+sharedRegulation_scatterPlot4 = ggplot(data=correlationDataFrame_75_vs_50, aes(x=deltaPSI_75_vs_50, deltaPSI_50_vs_75)) +
+  stat_cor(label.x.npc = .3, label.y.npc =1) +
+  ggrastr::geom_point_rast(alpha=0.36, color="darkgrey", size=0.3) +
+  geom_smooth(data=correlationDataFrame_75_vs_50, aes(x=deltaPSI_75_vs_50, deltaPSI_50_vs_75), method = "lm", color="darkgrey", se=FALSE) +
+  ggrastr::geom_point_rast(data=correlationDataFrame_75_vs_50_sig, aes(x=deltaPSI_75_vs_50_sig, y=deltaPSI_50_vs_75_sig), color="black", size=0.3) +
+  geom_smooth(data=correlationDataFrame_75_vs_50_sig, aes(x=deltaPSI_75_vs_50_sig, y=deltaPSI_50_vs_75_sig),method = "lm", color="black", se=FALSE) +
+  geom_hline(yintercept=0, size=.5, linetype="dashed") +
+  geom_vline(xintercept=0, size=.5, linetype="dashed") +
+  geom_abline(xintercept=0, slope=1, linetype="dashed", size=.75, color="firebrick2") +
+  coord_fixed(ratio = 1) +
+  xlab("dPSI 75 nt read length") +
+  ylab("dPSI 50 nt read length") +
+  theme_bw() +
+  theme(plot.title = element_text(face = "bold"))
+
+# correlation data frame 75 vs 36
+correlationDataFrame_75_vs_36 <- data.frame(deltaPSI_75_vs_36, deltaPSI_36_vs_75)
+correlationDataFrame_75_vs_36_sig <- data.frame(deltaPSI_75_vs_36_sig, deltaPSI_36_vs_75_sig)
+
+sharedRegulation_scatterPlot5 = ggplot(data=correlationDataFrame_75_vs_36, aes(x=deltaPSI_75_vs_36, deltaPSI_36_vs_75)) +
+  stat_cor(label.x.npc = .3, label.y.npc =1) +
+  ggrastr::geom_point_rast(alpha=0.36, color="darkgrey", size=0.3) +
+  geom_smooth(data=correlationDataFrame_75_vs_36, aes(x=deltaPSI_75_vs_36, deltaPSI_36_vs_75), method = "lm", color="darkgrey", se=FALSE) +
+  ggrastr::geom_point_rast(data=correlationDataFrame_75_vs_36_sig, aes(x=deltaPSI_75_vs_36_sig, y=deltaPSI_36_vs_75_sig), color="black", size=0.3) +
+  geom_smooth(data=correlationDataFrame_75_vs_36_sig, aes(x=deltaPSI_75_vs_36_sig, y=deltaPSI_36_vs_75_sig),method = "lm", color="black", se=FALSE) +
+  geom_hline(yintercept=0, size=.5, linetype="dashed") +
+  geom_vline(xintercept=0, size=.5, linetype="dashed") +
+  geom_abline(xintercept=0, slope=1, linetype="dashed", size=.75, color="firebrick2") +
+  coord_fixed(ratio = 1) +
+  xlab("dPSI 75 nt read length") +
+  ylab("dPSI 50 nt read length") +
+  theme_bw() +
+  theme(plot.title = element_text(face = "bold"))
+
+# correlation data frame 50 vs 36
+correlationDataFrame_50_vs_36 <- data.frame(deltaPSI_50_vs_36, deltaPSI_36_vs_50)
+correlationDataFrame_50_vs_36_sig <- data.frame(deltaPSI_50_vs_36_sig, deltaPSI_36_vs_50_sig)
+
+sharedRegulation_scatterPlot6 = ggplot(data=correlationDataFrame_50_vs_36, aes(x=deltaPSI_50_vs_36, deltaPSI_36_vs_50)) +
+  stat_cor(label.x.npc = .3, label.y.npc =1) +
+  ggrastr::geom_point_rast(alpha=0.36, color="darkgrey", size=0.3) +
+  geom_smooth(data=correlationDataFrame_50_vs_36, aes(x=deltaPSI_50_vs_36, deltaPSI_36_vs_50), method = "lm", color="darkgrey", se=FALSE) +
+  ggrastr::geom_point_rast(data=correlationDataFrame_50_vs_36_sig, aes(x=deltaPSI_50_vs_36_sig, y=deltaPSI_36_vs_50_sig), color="black", size=0.3) +
+  geom_smooth(data=correlationDataFrame_50_vs_36_sig, aes(x=deltaPSI_50_vs_36_sig, y=deltaPSI_36_vs_50_sig),method = "lm", color="black", se=FALSE) +
+  geom_hline(yintercept=0, size=.5, linetype="dashed") +
+  geom_vline(xintercept=0, size=.5, linetype="dashed") +
+  geom_abline(xintercept=0, slope=1, linetype="dashed", size=.75, color="firebrick2") +
+  coord_fixed(ratio = 1) +
+  xlab("\u0394\u03A8 50 nt read length") +
+  ylab("\u0394\u03A8 36 nt read length") +
+  theme_bw() +
+  theme(plot.title = element_text(face = "bold"))
+
+ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/sharedRegulation_100_50_RL_UPF1.pdf", plot = sharedRegulation_scatterPlot2, width = 5.65, height = 5.65, units = "cm")
+
+sharedRegulation_scatterPlot2
+```
+
+# Session info
+```{r}
+sessionInfo()
+```
+
