@@ -1,0 +1,1147 @@
+---
+title: "Impact of read depth on alternative splicing analysis (U2AF2 KD)"
+author: "Annika Ladwig"
+output:
+  prettydoc::html_pretty:
+    theme: HPSTR
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning=FALSE,message=FALSE,error=FALSE,fig.keep='all'}
+# LIBRARIES 
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(ggpubr)
+library("RColorBrewer")
+library("ggVennDiagram")
+library("wesanderson")
+library("colorspace")
+library(UpSetR)
+library(ggforce)
+
+# MY PARAMETERS
+probabilityThreshold = 0.9
+
+# MY THEME
+source("C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/theme_paper.R")
+theme_set(theme_paper())
+
+# MY FUNCTIONS
+# function to extract relevant rows and columns
+createTable <- function(file) {
+  file = file[-1] %>%
+    slice(7, 24, 27, 29, 31) %>%
+    rename(n = 1)
+  file = cbind(Reads = c("01 uniquely mapped", "02 multiple mapped", "03 unmapped 1", "04 unmapped 2", "05 unmapped 3"), file)
+  file[nrow(file) + 1,] = c("03 unmapped", sum(c(as.numeric(file[3:5, 2]))))
+  file = file %>% slice(1, 2, 6)
+}
+
+# function to load files as data frames
+loadFiles <- function(x){
+  x = read.table(file = x,
+                 header = TRUE,
+                 sep = "\t",
+                 stringsAsFactors = FALSE)
+}
+
+# function to count semicolons of column "mean_dpsi_per_lsv_junction"
+# to find out the number of junctions per LSV
+# store this information in new column "nJunctions"
+countJunctions <- function(x) {
+  SRSF6_junctionsPerLSV = x$mean_dpsi_per_lsv_junction %>%
+   str_count(pattern = ";") + 1
+  x$nJunctions = SRSF6_junctionsPerLSV
+  x
+}
+
+# count the amount of LSVs with 2, 3, 4, ... junctions
+# create data frame with this information
+complexityLSVs <- function(x) {
+   junctionsPerLSV = x$nJunctions %>%
+    table(dnn="junctionsPerLSV") %>%
+    as.data.frame
+   junctionsPerLSV
+}
+
+# function to extract max dpsi for each LSV and add new column with this information
+extractMaxDPSIs <- function(x) {
+  maxDeltaPSIs = x$mean_dpsi_per_lsv_junction %>%
+    str_split(pattern = ";") %>%
+    sapply(FUN = function(dPSIs){
+      return(
+        dPSIs %>% as.numeric %>% abs %>% max
+      )
+    })
+  x$maxDeltaPSI = maxDeltaPSIs
+  x
+}
+
+# function extract max prob. for each LSV and add a new column with this information
+extractMaxProbs <- function(x) {
+  maxProbs = x$probability_changing %>%
+    str_split(pattern=";") %>%
+    sapply(FUN=function(probs){
+      return(
+        probs %>% as.numeric %>% max
+      )
+    })
+  x$maxProb = maxProbs
+  x
+}
+```
+
+
+# 2.1 - Influence on LSV detection (Fig 2A)
+
+The influence of read depth on LSV detection is determined by counting the LSV hits (rows) in the tsv files received from MAJIQ for each read depth.
+
+```{r, warning=FALSE,message=FALSE,error=FALSE,fig.keep='all'}
+# load dpsi tsv files as list
+dpsiDir = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/U2AF2/MAJIQ/read_depth"
+dpsiFiles =list.files(path = dpsiDir, pattern = ".tsv")
+setwd(dpsiDir)
+
+# load dpsi tsv files as data frames
+dPSIs = lapply(dpsiFiles, loadFiles)
+```
+
+```{r, warning=FALSE,message=FALSE,error=FALSE,fig.keep='all'}
+# detected LSVs
+nLSVs_readDepth_1M = nrow(dPSIs[[1]])
+nLSVs_readDepth_2_5M = nrow(dPSIs[[2]])
+nLSVs_readDepth_5M = nrow(dPSIs[[3]])
+nLSVs_readDepth_10M = nrow(dPSIs[[4]])
+nLSVs_readDepth_15M = nrow(dPSIs[[5]])
+nLSVs_readDepth_20M = nrow(dPSIs[[6]])
+nLSVs_readDepth_25M = nrow(dPSIs[[7]])
+nLSVs_readDepth_30M = nrow(dPSIs[[8]])
+
+cat("number of LSVs for different read depth", fill = TRUE)
+nLSVs_readDepth_1M 
+nLSVs_readDepth_2_5M 
+nLSVs_readDepth_5M 
+nLSVs_readDepth_10M 
+nLSVs_readDepth_15M 
+nLSVs_readDepth_20M 
+nLSVs_readDepth_25M
+nLSVs_readDepth_30M 
+
+# create dataframe with nLSVs for each read depth
+nLSVs_df = data.frame(readDepth=c("01M", "025M", "05M", "10M", "15M", "20M", "25M", "30M"),
+                      nLSVs=c(nLSVs_readDepth_1M, nLSVs_readDepth_2_5M, nLSVs_readDepth_5M, nLSVs_readDepth_10M,
+                              nLSVs_readDepth_15M, nLSVs_readDepth_20M, nLSVs_readDepth_25M, nLSVs_readDepth_30M))
+
+# number of LSVs bar chart
+nLSVs_bar_read_depth = ggplot(data=nLSVs_df, aes(x = readDepth, y = nLSVs, fill = readDepth)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  ylim(0, 50500) +
+  xlab("read depth [nt]") +
+  ylab("# LSVs") +
+  ggtitle("A") +
+  scale_fill_manual(name = "read Depth [MM]", values = c(lighten("#36716E", 0.9), lighten("#36716E", 0.8), lighten("#36716E", 0.6), lighten("#36716E", 0.4), 
+                                                         lighten("#36716E", 0.2), "#36716E", darken("#36716E", 0.2), darken("#36716E", 0.4)), 
+                                                         labels = c("1", "2.5", "5", "10", "15", "20", "25", "30")) +
+  scale_x_discrete(labels = c("36", "50", "75", "100", "100", "100", "100", "100")) +
+  geom_text(aes(label=nLSVs), position=position_dodge(width=0.9), vjust=-0.25) 
+
+nLSVs_bar_read_depth
+
+# save ggplots
+ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/nLSVs_bar_read_depth.pdf", plot = nLSVs_bar_read_depth, width = 4.62, height = 6, units = "cm")
+```
+
+# 2.2 - Influence on LSV complexity (Fig 2B)
+
+The LSV complexity describes how many junctions an LSV has. To measure the influence on this, the LSVs with 2, 3, 4 or more than 4 junctions are counted for each read depth. 
+
+```{r, warning=FALSE,message=FALSE,error=FALSE,fig.keep='all'}
+# add new column with read depth to differ the data 
+# when merging the single data frames later to one 
+dPSIs[[1]]$readDepth = "01M"
+dPSIs[[2]]$readDepth = "025M"
+dPSIs[[3]]$readDepth = "05M"
+dPSIs[[4]]$readDepth = "10M"
+dPSIs[[5]]$readDepth = "15M"
+dPSIs[[6]]$readDepth = "20M"
+dPSIs[[7]]$readDepth = "25M"
+dPSIs[[8]]$readDepth = "30M"
+
+# apply functions on tsv files list and 
+# create new list with the data frames that contain the information about the complexity of the LSVs
+dPSIs = lapply(dPSIs, countJunctions)
+complexityLSVs = lapply(dPSIs, complexityLSVs)
+
+# add new column with read depth to differ the data 
+# when merging the single data frames later to one 
+complexityLSVs[[1]]$readDepth = "01M"
+complexityLSVs[[2]]$readDepth = "025M"
+complexityLSVs[[3]]$readDepth = "05M"
+complexityLSVs[[4]]$readDepth = "10M"
+complexityLSVs[[5]]$readDepth = "15M"
+complexityLSVs[[6]]$readDepth = "20M"
+complexityLSVs[[7]]$readDepth = "25M"
+complexityLSVs[[8]]$readDepth = "30M"
+
+# create data frame out of all read depth to build a stacked bar chart
+nJunctions_df <- rbind(complexityLSVs[[1]], complexityLSVs[[2]], complexityLSVs[[3]], complexityLSVs[[4]], 
+                       complexityLSVs[[5]], complexityLSVs[[6]], complexityLSVs[[7]], complexityLSVs[[8]])
+head(nJunctions_df)
+# all LSVs with junctions > 4 are grouped into one category
+# so that all LSVs with > 4 junctions get the same color in following stacked bar chart
+for (i in 1:nrow(nJunctions_df)){
+  if (as.integer(nJunctions_df[i, "junctionsPerLSV"]) >= 5) {
+    nJunctions_df[i, "junctionsPerLSV"] = 5
+  }
+}
+
+# source: http://jessicacorman.weebly.com/news--musings/how-to-make-a-stacked-bar-chart-with-color-shading
+StackedBarChart_nJunctions = ggplot(nJunctions_df, aes(x = readDepth, y = Freq)) +
+  geom_bar(stat = "identity", aes(fill = readDepth), position = "fill", show.legend = FALSE) +
+  scale_fill_manual(values = c(lighten("#36716E", 0.9), lighten("#36716E", 0.8), lighten("#36716E", 0.6), lighten("#36716E", 0.4), 
+                               lighten("#36716E", 0.2), "#36716E", darken("#36716E", 0.2), darken("#36716E", 0.4)),
+                    labels = c("1", "2.5", "5", "10", "15", "20", "25", "30"),
+                    name = "read depth [MM]") + 
+  geom_bar(stat = "identity", fill = "black", aes(alpha = junctionsPerLSV), position = "fill", show.legend = FALSE) +
+  scale_alpha_manual(values = c(0, 0.3, 0.55, 0.9),
+                     name = "junctions per LSV",
+                     breaks = c("2", "3", "4", "5"),
+                     labels = c("2", "3", "4", "> 4")) +
+  scale_x_discrete(labels = c("36", "50", "75", "100", "100", "100", "100", "100")) +
+  xlab("read depth [nt]") +
+  ylab("% LSVs") +
+  ggtitle("B") 
+                     
+StackedBarChart_nJunctions
+
+# save ggplots
+ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/complexityLSVs_readDepth.pdf", plot = StackedBarChart_nJunctions, width = 4.45, height = 6, units = "cm")
+```
+
+
+# 3 - Influence on the significance of LSVs (Fig 3)
+
+Influence of read depth on the significance of LSVs is determined by plotting the fraction of significantly regulated LSVs detected for each read depth. LSVs are considered significant if dPSI is at least 0.05 and probability changing is at least 0.9. 
+
+For each LSV, the maximum dpsi and max probability changing is chosen. These usually belong to the same junction.
+
+```{r, warning=FALSE,message=FALSE,error=FALSE,fig.keep='all'}
+# extract max dPSI for each LSV and add new column with this information
+dPSIs = lapply(dPSIs, extractMaxDPSIs)
+
+# extract max prob. for each LSV and add a new column with this information
+dPSIs = lapply(dPSIs, extractMaxProbs)
+
+# add new column called "significant" for each read depth which could be TRUE/FALSE 
+# TRUE if maxProb >= 0.9 and maxDPSI >= 0.05
+dPSIs[[1]]$significant = dPSIs[[1]]$maxProb >= probabilityThreshold & dPSIs[[1]]$maxDeltaPSI >= 0.05
+dPSIs[[2]]$significant = dPSIs[[2]]$maxProb >= probabilityThreshold & dPSIs[[2]]$maxDeltaPSI >= 0.05
+dPSIs[[3]]$significant = dPSIs[[3]]$maxProb >= probabilityThreshold & dPSIs[[3]]$maxDeltaPSI >= 0.05
+dPSIs[[4]]$significant = dPSIs[[4]]$maxProb >= probabilityThreshold & dPSIs[[4]]$maxDeltaPSI >= 0.05
+dPSIs[[5]]$significant = dPSIs[[5]]$maxProb >= probabilityThreshold & dPSIs[[5]]$maxDeltaPSI >= 0.05
+dPSIs[[6]]$significant = dPSIs[[6]]$maxProb >= probabilityThreshold & dPSIs[[6]]$maxDeltaPSI >= 0.05
+dPSIs[[7]]$significant = dPSIs[[7]]$maxProb >= probabilityThreshold & dPSIs[[7]]$maxDeltaPSI >= 0.05
+dPSIs[[8]]$significant = dPSIs[[8]]$maxProb >= probabilityThreshold & dPSIs[[8]]$maxDeltaPSI >= 0.05
+
+# output which LSVs are significant and which are not for each read depth
+table(dPSIs[[1]]$significant)
+table(dPSIs[[2]]$significant)
+table(dPSIs[[3]]$significant)
+table(dPSIs[[4]]$significant)
+table(dPSIs[[5]]$significant)
+table(dPSIs[[6]]$significant)
+table(dPSIs[[7]]$significant)
+table(dPSIs[[8]]$significant)
+
+# count significant and not significant LSVs for each read depth
+nSignificant_1M = sum(dPSIs[[1]]$significant)
+nNotSignificant_1M = (nLSVs_readDepth_1M-sum(dPSIs[[1]]$significant))
+
+nSignificant_2_5M = sum(dPSIs[[2]]$significant)
+nNotSignificant_2_5M = (nLSVs_readDepth_2_5M-sum(dPSIs[[2]]$significant))
+
+nSignificant_5M = sum(dPSIs[[3]]$significant)
+nNotSignificant_5M = (nLSVs_readDepth_5M-sum(dPSIs[[3]]$significant))
+
+nSignificant_10M = sum(dPSIs[[4]]$significant)
+nNotSignificant_10M = (nLSVs_readDepth_10M-sum(dPSIs[[4]]$significant))
+
+nSignificant_15M = sum(dPSIs[[5]]$significant)
+nNotSignificant_15M = (nLSVs_readDepth_15M-sum(dPSIs[[5]]$significant))
+
+nSignificant_20M = sum(dPSIs[[6]]$significant)
+nNotSignificant_20M = (nLSVs_readDepth_20M-sum(dPSIs[[6]]$significant))
+
+nSignificant_25M = sum(dPSIs[[7]]$significant)
+nNotSignificant_25M = (nLSVs_readDepth_25M-sum(dPSIs[[7]]$significant))
+
+nSignificant_30M = sum(dPSIs[[8]]$significant)
+nNotSignificant_30M = (nLSVs_readDepth_30M-sum(dPSIs[[8]]$significant))
+
+# create data frame with a column for the read depth
+# and a column indicating whether the associated LSV is significant or not 
+significantLSVs_df_relative = data.frame(comparison=c(rep("01M", nrow(dPSIs[[1]])),
+                                                      rep("025M", nrow(dPSIs[[2]])), 
+                                                      rep("05M", nrow(dPSIs[[3]])), 
+                                                      rep("10M", nrow(dPSIs[[4]])),
+                                                      rep("15M", nrow(dPSIs[[5]])),
+                                                      rep("20M", nrow(dPSIs[[6]])), 
+                                                      rep("25M", nrow(dPSIs[[7]])), 
+                                                      rep("30M", nrow(dPSIs[[8]]))),
+                                         significant=c(dPSIs[[1]]$significant,
+                                                       dPSIs[[2]]$significant, 
+                                                       dPSIs[[3]]$significant, 
+                                                       dPSIs[[4]]$significant,
+                                                       dPSIs[[5]]$significant,
+                                                       dPSIs[[6]]$significant, 
+                                                       dPSIs[[7]]$significant, 
+                                                       dPSIs[[8]]$significant))
+
+# differ between the significance of LSVs of different read depth to plot them in different colors 
+for (i in 1:nrow(significantLSVs_df_relative)){
+  if (significantLSVs_df_relative[i, "comparison"] == "01M" && significantLSVs_df_relative[i, "significant"] == TRUE){
+    significantLSVs_df_relative[i, "significant"] = "TRUE read depth 01M"
+  }
+  if (significantLSVs_df_relative[i, "comparison"] == "025M" && significantLSVs_df_relative[i, "significant"] == TRUE){
+    significantLSVs_df_relative[i, "significant"] = "TRUE read depth 025M"
+  }
+  if (significantLSVs_df_relative[i, "comparison"] == "05M" && significantLSVs_df_relative[i, "significant"] == TRUE){
+    significantLSVs_df_relative[i, "significant"] = "TRUE read depth 05M"
+  }
+  if (significantLSVs_df_relative[i, "comparison"] == "10M" && significantLSVs_df_relative[i, "significant"] == TRUE){
+    significantLSVs_df_relative[i, "significant"] = "TRUE read depth 10M"
+  }
+  if (significantLSVs_df_relative[i, "comparison"] == "15M" && significantLSVs_df_relative[i, "significant"] == TRUE){
+    significantLSVs_df_relative[i, "significant"] = "TRUE read depth 15M"
+  }
+  if (significantLSVs_df_relative[i, "comparison"] == "20M" && significantLSVs_df_relative[i, "significant"] == TRUE){
+    significantLSVs_df_relative[i, "significant"] = "TRUE read depth 20M"
+  }
+  if (significantLSVs_df_relative[i, "comparison"] == "25M" && significantLSVs_df_relative[i, "significant"] == TRUE){
+    significantLSVs_df_relative[i, "significant"] = "TRUE read depth 25M"
+  }
+  if (significantLSVs_df_relative[i, "comparison"] == "30M" && significantLSVs_df_relative[i, "significant"] == TRUE){
+    significantLSVs_df_relative[i, "significant"] = "TRUE read depth 30M"
+  }
+}
+
+# percentage stacked bar chart
+# stacked bar chart showing fraction of significant LSVs among all LSVs for each read depth  
+nSignificantLSVs_bar_relative = ggplot(data=significantLSVs_df_relative, aes(x = comparison, fill = factor(significant))) +
+  geom_bar(position = "fill", show.legend = FALSE) +
+  xlab("read depth [MM]") +
+  ylab("% LSVs") +
+  coord_cartesian(ylim = c(0, 0.06)) +
+  scale_fill_manual(name= "significant", values = c("lightgrey", lighten("#36716E", 0.95), lighten("#36716E", 0.8), lighten("#36716E", 0.6), 
+                                                    lighten("#36716E", 0.4), lighten("#36716E", 0.2), "#36716E", darken("#36716E", 0.2), 
+                                                    darken("#36716E", 0.4)), 
+                    labels = c("FALSE", "TRUE", "TRUE", "TRUE", "TRUE", "TRUE", "TRUE", "TRUE", "TRUE")) +
+  scale_x_discrete(labels = c("1", "2.5", "5", "10", "15", "20", "25", "30")) +
+  ggtitle("C")
+
+nSignificantLSVs_bar_relative
+
+# total counts
+# create dataframe with number of significant regulated LSVs
+nSignificantLSVs_df_absolute = data.frame(readDepth=c("01M", "025M", "05M", "10M", "15M", "20M", "25M", "30M"),
+                                          nSignificantLSVs=c(nSignificant_1M, nSignificant_2_5M, nSignificant_5M, nSignificant_10M, 
+                                                             nSignificant_15M, nSignificant_20M, nSignificant_25M, nSignificant_30M))
+
+# number of signifcant LSVs bar chart
+nSignificantLSVs_bar_absolute = ggplot(data=nSignificantLSVs_df_absolute, aes(x = readDepth, y = nSignificantLSVs, fill = readDepth)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  xlab("read depth [MM]") +
+  ylab("# significant LSVs") +
+  ggtitle("C") +
+  scale_fill_manual(name = "read depth [MM]", values = c(lighten("#36716E", 0.95), lighten("#36716E", 0.8), lighten("#36716E", 0.6), lighten("#36716E", 0.4), 
+                                                         lighten("#36716E", 0.2), "#36716E", darken("#36716E", 0.2), darken("#36716E", 0.4)), 
+                    labels = c("1", "2.5", "5", "10", "15", "20", "25", "30")) +
+  scale_x_discrete(labels = c("1", "2.5", "5", "10", "15", "20", "25", "30")) +
+  geom_text(aes(label=nSignificantLSVs), position=position_dodge(width=0.9), vjust=1) 
+
+nSignificantLSVs_bar_absolute 
+
+# save plots
+ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/significantLSVs_readDepth_absolute.pdf", plot = nSignificantLSVs_bar_absolute, width = 4.5, height = 6, units = "cm")
+ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/significantLSVs_readDepth_relative.pdf", plot = nSignificantLSVs_bar_relative, width = 4.48, height = 6, units = "cm")
+```
+# Influence on size of detected splicing changes (Fig 4)
+
+```{r, warning=FALSE,message=FALSE,error=FALSE,fig.keep='all'}
+# ecdf for delta psis and probability changing
+ecdf_deltaPSI = ggplot() +
+  stat_ecdf(aes(x = maxDeltaPSI), color = "black", data = dPSIs[[1]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxDeltaPSI, color = readDepth), data = dPSIs[[1]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxDeltaPSI), color = "black", data = dPSIs[[2]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxDeltaPSI, color = readDepth), data = dPSIs[[2]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxDeltaPSI), color = "black", data = dPSIs[[3]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxDeltaPSI, color = readDepth), data = dPSIs[[3]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxDeltaPSI), color = "black", data = dPSIs[[4]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxDeltaPSI, color = readDepth), data = dPSIs[[4]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxDeltaPSI), color = "black", data = dPSIs[[5]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxDeltaPSI, color = readDepth), data = dPSIs[[5]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxDeltaPSI), color = "black", data = dPSIs[[6]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxDeltaPSI, color = readDepth), data = dPSIs[[6]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxDeltaPSI), color = "black", data = dPSIs[[7]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxDeltaPSI, color = readDepth), data = dPSIs[[7]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxDeltaPSI), color = "black", data = dPSIs[[8]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxDeltaPSI, color = readDepth), data = dPSIs[[8]], size = 1, pad = FALSE) +
+  
+  scale_color_manual(name = "read depth  [MM]", values = c(lighten("#2DACA4", 0.95), lighten("#2DACA4", 0.9), 
+                                                           lighten("#2DACA4", 0.6), lighten("#2DACA4", 0.3), 
+                                                           "#2DACA4", "#36716E", darken("#36716E",0.3), 
+                                                           darken("#36716E",0.6)), 
+                     labels = c("1", "2.5", "5", "10", "15", "20", "25", "30")) + 
+  geom_vline(xintercept = 0.05, col = "red3", linetype = "dashed", size = 0.5) +
+  coord_cartesian(xlim = c(0, 0.5)) +
+  ylab("ecdf") +
+  xlab("dPSI") +
+  ggtitle("B") +
+  theme(legend.position="none")
+
+ecdf_prob_changing = ggplot() +
+  
+  stat_ecdf(aes(x = maxProb), color = "black", data = dPSIs[[1]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxProb, color = readDepth), data = dPSIs[[1]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxProb), color = "black", data = dPSIs[[2]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxProb, color = readDepth), data = dPSIs[[2]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxProb), color = "black", data = dPSIs[[3]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxProb, color = readDepth), data = dPSIs[[3]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxProb), color = "black", data = dPSIs[[4]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxProb, color = readDepth), data = dPSIs[[4]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxProb), color = "black", data = dPSIs[[5]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxProb, color = readDepth), data = dPSIs[[5]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxProb), color = "black", data = dPSIs[[6]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxProb, color = readDepth), data = dPSIs[[6]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxProb), color = "black", data = dPSIs[[7]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxProb, color = readDepth), data = dPSIs[[7]], size = 1, pad = FALSE) +
+  
+  stat_ecdf(aes(x = maxProb), color = "black", data = dPSIs[[8]], size = 1.25, pad = FALSE) +
+  stat_ecdf(aes(x = maxProb, color = readDepth), data = dPSIs[[8]], size = 1, pad = FALSE) +
+  
+  scale_color_manual(name = "read depth  [MM]", values = c(lighten("#2DACA4", 0.95), lighten("#2DACA4", 0.9), 
+                                                           lighten("#2DACA4", 0.6), lighten("#2DACA4", 0.3), 
+                                                           "#2DACA4", "#36716E", darken("#36716E",0.3), 
+                                                           darken("#36716E",0.6)), 
+                     labels = c("1", "2.5", "5", "10", "15", "20", "25", "30")) + 
+  xlim(0, 1) +
+  ylab("ecdf") +
+  geom_vline(xintercept = 0.9, col = "red3", linetype = "dashed", size = 0.5) +
+  xlab("P(|dPSI| > 0.05)") +
+  ggtitle("B") +
+  theme(legend.position="none")
+
+
+ecdf_deltaPSI
+ecdf_prob_changing 
+
+# save ggplots
+ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/ecdf_dPSI_readDepth.pdf", plot = ecdf_deltaPSI, width = 4.2, height = 4.2, units = "cm")
+ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/ecdf_probChanging_readDepth.pdf", plot = ecdf_prob_changing, width = 4.2, height = 4.2, units = "cm")
+```
+
+## Shared significant regulated LSVs
+
+```{r, warning=FALSE,message=FALSE,error=FALSE,fig.keep='all'}
+# extract all significant LSVs for each read depth
+significantLSVs_1M = dPSIs[[1]]$lsv_id[dPSIs[[1]]$significant == TRUE]
+
+significantLSVs_2_5M = dPSIs[[2]]$lsv_id[dPSIs[[2]]$significant == TRUE]
+
+significantLSVs_5M = dPSIs[[3]]$lsv_id[dPSIs[[3]]$significant == TRUE]
+
+significantLSVs_10M = dPSIs[[4]]$lsv_id[dPSIs[[4]]$significant == TRUE]
+
+significantLSVs_15M = dPSIs[[5]]$lsv_id[dPSIs[[5]]$significant == TRUE]
+
+significantLSVs_20M = dPSIs[[6]]$lsv_id[dPSIs[[6]]$significant == TRUE]
+
+significantLSVs_25M = dPSIs[[7]]$lsv_id[dPSIs[[7]]$significant == TRUE]
+
+significantLSVs_30M = dPSIs[[8]]$lsv_id[dPSIs[[8]]$significant == TRUE]
+
+# create list with all significant LSVs for each read depth
+significantLSVs_all = list("1M" = c(significantLSVs_1M), "2.5M" = c(significantLSVs_2_5M), "5M" = c(significantLSVs_5M), "10M" = c(significantLSVs_10M),
+                           "15M" = c(significantLSVs_15M), "20M" = c(significantLSVs_20M), "25M" = c(significantLSVs_25M), "30M" = c(significantLSVs_30M))
+
+pdf(file="C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/upset_read_depth.pdf", width=8, height=4.3) # or other device
+# make upset plot from this informatio
+upset(fromList(significantLSVs_all), 
+      nsets = 8,
+      order.by = "freq", 
+      sets.bar.color = c(darken("#36716E",0.4), darken("#36716E",0.2), "#36716E", lighten("#36716E", 0.2), 
+                         lighten("#36716E", 0.4), lighten("#36716E", 0.6), lighten("#36716E", 0.8), lighten("#36716E", 0.95)), 
+      sets.x.label = "# LSVs", 
+      mainbar.y.label = "# shared significant LSVs")
+dev.off()
+
+```
+## Shared binary regulation between the different read depths
+
+```{r, warning=FALSE,message=FALSE,error=FALSE,fig.keep='all'}
+#################
+# All binary LSVs
+#################
+
+# filter the data frames for significant LSVs with 2 Junctions
+filtered_1M = dPSIs[[1]][dPSIs[[1]]$nJunctions == 2,]
+
+filtered_2.5M = dPSIs[[2]][dPSIs[[2]]$nJunctions == 2,]
+
+filtered_5M = dPSIs[[3]][dPSIs[[3]]$nJunctions == 2,]
+
+filtered_10M = dPSIs[[4]][dPSIs[[4]]$nJunctions == 2,]
+
+filtered_15M = dPSIs[[5]][dPSIs[[5]]$nJunctions == 2,]
+
+filtered_20M = dPSIs[[6]][dPSIs[[6]]$nJunctions == 2,]
+
+filtered_25M = dPSIs[[7]][dPSIs[[7]]$nJunctions == 2,]
+
+filtered_30M = dPSIs[[8]][dPSIs[[8]]$nJunctions == 2,]
+
+
+# identify shared significant LSVs for each comparison
+# comparison 30M/25M 30M/20M 30M/15M 30M/10M 30M/5M 30M/2.5M 30M/1M 
+shared_30M_25M = intersect(filtered_30M$lsv_id, filtered_25M$lsv_id) 
+length(shared_30M_25M)
+
+shared_30M_20M = intersect(filtered_30M$lsv_id, filtered_20M$lsv_id) 
+length(shared_30M_20M)
+
+shared_30M_15M = intersect(filtered_30M$lsv_id, filtered_15M$lsv_id) 
+length(shared_30M_15M)
+
+shared_30M_10M = intersect(filtered_30M$lsv_id, filtered_10M$lsv_id) 
+length(shared_30M_10M)
+
+shared_30M_5M = intersect(filtered_30M$lsv_id, filtered_5M$lsv_id) 
+length(shared_30M_5M)
+
+shared_30M_2.5M = intersect(filtered_30M$lsv_id, filtered_2.5M$lsv_id) 
+length(shared_30M_2.5M)
+
+shared_30M_1M = intersect(filtered_30M$lsv_id, filtered_1M$lsv_id) 
+length(shared_30M_1M)
+
+
+# extract filtered LSVs from the data frames above
+# compare 30M reads with 25M reads
+match_30M_25M <- filtered_30M[match(shared_30M_25M, filtered_30M$lsv_id),]
+
+match_25M_30M <- filtered_25M[match(shared_30M_25M, filtered_25M$lsv_id),]
+
+# compare 30M reads with 20M reads
+match_30M_20M <- filtered_30M[match(shared_30M_20M, filtered_30M$lsv_id),]
+
+match_20M_30M <- filtered_20M[match(shared_30M_20M, filtered_20M$lsv_id),]
+
+# compare 30M reads with 15M reads
+match_30M_15M <- filtered_30M[match(shared_30M_15M, filtered_30M$lsv_id),]
+
+match_15M_30M <- filtered_15M[match(shared_30M_15M, filtered_15M$lsv_id),]
+
+# compare 30M reads with 10M reads
+match_30M_10M <- filtered_30M[match(shared_30M_10M, filtered_30M$lsv_id),]
+
+match_10M_30M <- filtered_10M[match(shared_30M_10M, filtered_10M$lsv_id),]
+
+# compare 30M reads with 5M reads
+match_30M_5M <- filtered_30M[match(shared_30M_5M, filtered_30M$lsv_id),]
+
+match_5M_30M <- filtered_5M[match(shared_30M_5M, filtered_5M$lsv_id),]
+
+# compare 30M reads with 2.5M reads
+match_30M_2.5M <- filtered_30M[match(shared_30M_2.5M, filtered_30M$lsv_id),]
+
+match_2.5M_30M <- filtered_2.5M[match(shared_30M_2.5M, filtered_2.5M$lsv_id),]
+
+# compare 30M reads with 1M reads
+match_30M_1M <- filtered_30M[match(shared_30M_1M, filtered_30M$lsv_id),]
+
+match_1M_30M <- filtered_1M[match(shared_30M_1M, filtered_1M$lsv_id),]
+
+
+# extract dpsi value of the first junction for all LSVs
+# deltapsi 30M vs 25M 
+deltaPSI_30M_vs_25M = match_30M_25M$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+deltaPSI_25M_vs_30M = match_25M_30M$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 30M vs 20M 
+deltaPSI_30M_vs_20M = match_30M_20M$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+deltaPSI_20M_vs_30M = match_20M_30M$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 30M vs 15M  
+deltaPSI_30M_vs_15M = match_30M_15M$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_15M_vs_30M = match_15M_30M$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 30M vs 10M 
+deltaPSI_30M_vs_10M = match_30M_10M$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_10M_vs_30M = match_10M_30M$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 30M vs 5M 
+deltaPSI_30M_vs_5M = match_30M_5M$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_5M_vs_30M = match_5M_30M$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 30M vs 2.5M 
+deltaPSI_30M_vs_2.5M = match_30M_2.5M$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_2.5M_vs_30M = match_2.5M_30M$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 30M vs 1M 
+deltaPSI_30M_vs_1M = match_30M_1M$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_1M_vs_30M = match_1M_30M$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+
+#########################
+# Significant binary LSVs
+#########################
+
+# filter the data fraM_siges for significant LSVs with 2 Junctions
+filtered_1M_sig = dPSIs[[1]][dPSIs[[1]]$nJunctions == 2 & dPSIs[[1]]$significant == TRUE,]
+
+filtered_2.5M_sig = dPSIs[[2]][dPSIs[[2]]$nJunctions == 2 & dPSIs[[2]]$significant == TRUE,]
+
+filtered_5M_sig = dPSIs[[3]][dPSIs[[3]]$nJunctions == 2 & dPSIs[[3]]$significant == TRUE,]
+
+filtered_10M_sig = dPSIs[[4]][dPSIs[[4]]$nJunctions == 2 & dPSIs[[4]]$significant == TRUE,]
+
+filtered_15M_sig = dPSIs[[5]][dPSIs[[5]]$nJunctions == 2 & dPSIs[[5]]$significant == TRUE,]
+
+filtered_20M_sig = dPSIs[[6]][dPSIs[[6]]$nJunctions == 2 & dPSIs[[6]]$significant == TRUE,]
+
+filtered_25M_sig = dPSIs[[7]][dPSIs[[7]]$nJunctions == 2 & dPSIs[[7]]$significant == TRUE,]
+
+filtered_30M_sig = dPSIs[[8]][dPSIs[[8]]$nJunctions == 2 & dPSIs[[8]]$significant == TRUE,]
+
+
+# identify shared significant LSVs for each comparison
+# comparison 30M/25M 30M/20M 30M/15M 30M/10M 30M/5M 30M/2.5M 30M/1M 
+shared_30M_25M_sig = intersect(filtered_30M_sig$lsv_id, filtered_25M_sig$lsv_id) 
+length(shared_30M_25M)
+
+shared_30M_20M_sig = intersect(filtered_30M_sig$lsv_id, filtered_20M_sig$lsv_id) 
+length(shared_30M_20M)
+
+shared_30M_15M_sig = intersect(filtered_30M_sig$lsv_id, filtered_15M_sig$lsv_id) 
+length(shared_30M_15M)
+
+shared_30M_10M_sig = intersect(filtered_30M_sig$lsv_id, filtered_10M_sig$lsv_id) 
+length(shared_30M_10M)
+
+shared_30M_5M_sig = intersect(filtered_30M_sig$lsv_id, filtered_5M_sig$lsv_id) 
+length(shared_30M_5M)
+
+shared_30M_2.5M_sig = intersect(filtered_30M_sig$lsv_id, filtered_2.5M_sig$lsv_id) 
+length(shared_30M_2.5M)
+
+shared_30M_1M_sig = intersect(filtered_30M_sig$lsv_id, filtered_1M_sig$lsv_id) 
+length(shared_30M_1M)
+
+
+# extract filtered LSVs from the data frames above
+# compare 30M reads with 25M reads
+match_30M_25M_sig <- filtered_30M_sig[match(shared_30M_25M_sig, filtered_30M_sig$lsv_id),]
+
+match_25M_30M_sig <- filtered_25M_sig[match(shared_30M_25M_sig, filtered_25M_sig$lsv_id),]
+
+# compare 30M reads with 20M reads
+match_30M_20M_sig <- filtered_30M_sig[match(shared_30M_20M_sig, filtered_30M_sig$lsv_id),]
+
+match_20M_30M_sig <- filtered_20M_sig[match(shared_30M_20M_sig, filtered_20M_sig$lsv_id),]
+
+# compare 30M reads with 15M reads
+match_30M_15M_sig <- filtered_30M_sig[match(shared_30M_15M_sig, filtered_30M_sig$lsv_id),]
+
+match_15M_30M_sig <- filtered_15M_sig[match(shared_30M_15M_sig, filtered_15M_sig$lsv_id),]
+
+# compare 30M reads with 10M reads
+match_30M_10M_sig <- filtered_30M_sig[match(shared_30M_10M_sig, filtered_30M_sig$lsv_id),]
+
+match_10M_30M_sig <- filtered_10M_sig[match(shared_30M_10M_sig, filtered_10M_sig$lsv_id),]
+
+# compare 30M reads with 5M reads
+match_30M_5M_sig <- filtered_30M_sig[match(shared_30M_5M_sig, filtered_30M_sig$lsv_id),]
+
+match_5M_30M_sig <- filtered_5M_sig[match(shared_30M_5M_sig, filtered_5M_sig$lsv_id),]
+
+# compare 30M reads with 2.5M reads
+match_30M_2.5M_sig <- filtered_30M_sig[match(shared_30M_2.5M_sig, filtered_30M_sig$lsv_id),]
+
+match_2.5M_30M_sig <- filtered_2.5M_sig[match(shared_30M_2.5M_sig, filtered_2.5M_sig$lsv_id),]
+
+# compare 30M reads with 1M reads
+match_30M_1M_sig <- filtered_30M_sig[match(shared_30M_1M_sig, filtered_30M_sig$lsv_id),]
+
+match_1M_30M_sig <- filtered_1M_sig[match(shared_30M_1M_sig, filtered_1M_sig$lsv_id),]
+
+
+# extract dpsi value of the first junction for all LSVs
+# deltapsi 30M vs 25M 
+deltaPSI_30M_vs_25M_sig = match_30M_25M_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+deltaPSI_25M_vs_30M_sig = match_25M_30M_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 30M vs 20M 
+deltaPSI_30M_vs_20M_sig = match_30M_20M_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+deltaPSI_20M_vs_30M_sig = match_20M_30M_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 30M vs 15M  
+deltaPSI_30M_vs_15M_sig = match_30M_15M_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_15M_vs_30M_sig = match_15M_30M_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 30M vs 10M 
+deltaPSI_30M_vs_10M_sig = match_30M_10M_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_10M_vs_30M_sig = match_10M_30M_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 30M vs 5M 
+deltaPSI_30M_vs_5M_sig = match_30M_5M_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_5M_vs_30M_sig = match_5M_30M_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 30M vs 2.5M 
+deltaPSI_30M_vs_2.5M_sig = match_30M_2.5M_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_2.5M_vs_30M_sig = match_2.5M_30M_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+
+# deltapsi 30M vs 1M 
+deltaPSI_30M_vs_1M_sig = match_30M_1M_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric                   
+
+deltaPSI_1M_vs_30M_sig = match_1M_30M_sig$mean_dpsi_per_lsv_junction %>%
+  strsplit(split = ";") %>% 
+  sapply(FUN = "[[",1) %>% as.numeric
+```
+
+```{r, warning=FALSE,message=FALSE,error=FALSE,fig.keep='all'}
+# build data frame out of vectors with dpsi values 
+# create scatter plot with the data frames
+
+# correlation data frame 30M vs 25M reads
+correlationDataFrame_30M_vs_25M <- data.frame(deltaPSI_30M_vs_25M, deltaPSI_25M_vs_30M)
+correlationDataFrame_30M_vs_25M_sig <- data.frame(deltaPSI_30M_vs_25M_sig, deltaPSI_25M_vs_30M_sig)
+
+sharedRegulation_scatterPlot1 = ggplot(data=correlationDataFrame_30M_vs_25M, aes(x=deltaPSI_30M_vs_25M, deltaPSI_25M_vs_30M)) +
+  stat_cor(label.x.npc = .3, label.y.npc =1) +
+  ggrastr::geom_point_rast(alpha=0.36, color="darkgrey") +
+  geom_smooth(data=correlationDataFrame_30M_vs_25M, aes(x=deltaPSI_30M_vs_25M, deltaPSI_25M_vs_30M), method = "lm", color="darkgrey", se=FALSE) +
+  ggrastr::geom_point_rast(data=correlationDataFrame_30M_vs_25M_sig, aes(x=deltaPSI_30M_vs_25M_sig, y=deltaPSI_25M_vs_30M_sig), color="black") +
+  geom_smooth(data=correlationDataFrame_30M_vs_25M_sig, aes(x=deltaPSI_30M_vs_25M_sig, y=deltaPSI_25M_vs_30M_sig),method = "lm", color="black", se=FALSE) +
+  geom_hline(yintercept=0, size=.5, linetype="dashed") +
+  geom_vline(xintercept=0, size=.5, linetype="dashed") +
+  geom_abline(xintercept=0, slope=1, linetype="dashed", size=.75, color="firebrick2") +
+  coord_fixed(ratio = 1) +
+  xlab("\u0394\u03A8 30 M reads") +
+  ylab("\u0394\u03A8 25 M reads") +
+  theme_bw() +
+  theme(plot.title = element_text(face = "bold"))
+
+
+# correlation data frame 30M vs 20M reads
+correlationDataFrame_30M_vs_20M <- data.frame(deltaPSI_30M_vs_20M, deltaPSI_20M_vs_30M)
+correlationDataFrame_30M_vs_20M_sig <- data.frame(deltaPSI_30M_vs_20M_sig, deltaPSI_20M_vs_30M_sig)
+
+sharedRegulation_scatterPlot2 = ggplot(data=correlationDataFrame_30M_vs_20M, aes(x=deltaPSI_30M_vs_20M, deltaPSI_20M_vs_30M)) + 
+  stat_cor(label.x.npc = .3, label.y.npc =1) +
+  ggrastr::geom_point_rast(alpha=0.36, color="darkgrey") +
+  geom_smooth(data=correlationDataFrame_30M_vs_20M, aes(x=deltaPSI_30M_vs_20M, deltaPSI_20M_vs_30M), method = "lm", color="darkgrey", se=FALSE) +
+  ggrastr::geom_point_rast(data=correlationDataFrame_30M_vs_20M_sig, aes(x=deltaPSI_30M_vs_20M_sig, y=deltaPSI_20M_vs_30M_sig), color="black") +
+  geom_smooth(data=correlationDataFrame_30M_vs_20M_sig, aes(x=deltaPSI_30M_vs_20M_sig, y=deltaPSI_20M_vs_30M_sig),method = "lm", color="black") +
+  geom_hline(yintercept=0, size=.5, linetype="dashed") +
+  geom_vline(xintercept=0, size=.5, linetype="dashed") + 
+  geom_abline(xintercept=0, slope=1, linetype="dashed", size=.75, color="firebrick2") +
+  coord_fixed(ratio = 1) +
+  xlab("\u0394\u03A8 30 M reads") +
+  ylab("\u0394\u03A8 20 M reads") +
+  theme_bw() +
+  theme(plot.title = element_text(face = "bold"))
+
+
+# correlation data frame 30M vs 15M reads
+correlationDataFrame_30M_vs_15M <- data.frame(deltaPSI_30M_vs_15M, deltaPSI_15M_vs_30M)
+correlationDataFrame_30M_vs_15M_sig <- data.frame(deltaPSI_30M_vs_15M_sig, deltaPSI_15M_vs_30M_sig)
+
+sharedRegulation_scatterPlot3 = ggplot(data=correlationDataFrame_30M_vs_15M, aes(x=deltaPSI_30M_vs_15M, deltaPSI_15M_vs_30M)) +
+  stat_cor(label.x.npc = .3, label.y.npc =1) +
+  ggrastr::geom_point_rast(alpha=0.36, color="darkgrey") +
+  geom_smooth(data=correlationDataFrame_30M_vs_15M, aes(x=deltaPSI_30M_vs_15M, deltaPSI_15M_vs_30M), method = "lm", color="darkgrey", se=FALSE) +
+  ggrastr::geom_point_rast(data=correlationDataFrame_30M_vs_15M_sig, aes(x=deltaPSI_30M_vs_15M_sig, y=deltaPSI_15M_vs_30M_sig), color="black") +
+  geom_smooth(data=correlationDataFrame_30M_vs_15M_sig, aes(x=deltaPSI_30M_vs_15M_sig, y=deltaPSI_15M_vs_30M_sig),method = "lm", color="black", se=FALSE) +
+  geom_hline(yintercept=0, size=.5, linetype="dashed") +
+  geom_vline(xintercept=0, size=.5, linetype="dashed") +
+  geom_abline(xintercept=0, slope=1, linetype="dashed", size=.75, color="firebrick2") +
+  coord_fixed(ratio = 1) +
+  xlab("\u0394\u03A8 30 M reads") +
+  ylab("\u0394\u03A8 15 M reads") +
+  theme_bw() +
+  theme(plot.title = element_text(face = "bold"))
+
+
+# correlation data frame 30M vs 10M reads
+correlationDataFrame_30M_vs_10M <- data.frame(deltaPSI_30M_vs_10M, deltaPSI_10M_vs_30M)
+correlationDataFrame_30M_vs_10M_sig <- data.frame(deltaPSI_30M_vs_10M_sig, deltaPSI_10M_vs_30M_sig)
+
+sharedRegulation_scatterPlot4 = ggplot(data=correlationDataFrame_30M_vs_10M, aes(x=deltaPSI_30M_vs_10M, deltaPSI_10M_vs_30M)) +
+  stat_cor(label.x.npc = .3, label.y.npc =1) +
+  ggrastr::geom_point_rast(alpha=0.36, color="#979797", size=0.25) +
+  geom_smooth(data=correlationDataFrame_30M_vs_10M, aes(x=deltaPSI_30M_vs_10M, deltaPSI_10M_vs_30M), method = "lm", color="darkgrey", se=FALSE) +
+  ggrastr::geom_point_rast(data=correlationDataFrame_30M_vs_10M_sig, aes(x=deltaPSI_30M_vs_10M_sig, y=deltaPSI_10M_vs_30M_sig), color="black", size=0.25) +
+  geom_smooth(data=correlationDataFrame_30M_vs_10M_sig, aes(x=deltaPSI_30M_vs_10M_sig, y=deltaPSI_10M_vs_30M_sig),method = "lm", color="black", se=FALSE) +
+  geom_hline(yintercept=0, size=.5, linetype="dashed") +
+  geom_vline(xintercept=0, size=.5, linetype="dashed") +
+  geom_abline(xintercept=0, slope=1, linetype="dashed", size=.75, color="black") +
+  coord_cartesian(xlim = c(-1, 1), ylim = c(-1, 1)) +
+  xlab("dPSI 30 M reads") +
+  ylab("dPSI 10 M reads") +
+  theme_bw() +
+  theme(plot.title = element_text(face = "bold")) +
+  theme(aspect.ratio=1) +
+  ggtitle("E")
+
+
+# correlation data frame 30M vs 5M reads
+correlationDataFrame_30M_vs_5M <- data.frame(deltaPSI_30M_vs_5M, deltaPSI_5M_vs_30M)
+correlationDataFrame_30M_vs_5M_sig <- data.frame(deltaPSI_30M_vs_5M_sig, deltaPSI_5M_vs_30M_sig)
+
+sharedRegulation_scatterPlot5 = ggplot(data=correlationDataFrame_30M_vs_5M, aes(x=deltaPSI_30M_vs_5M, deltaPSI_5M_vs_30M)) +
+  stat_cor(label.x.npc = .3, label.y.npc =1) +
+  ggrastr::geom_point_rast(alpha=0.36, color="darkgrey") +
+  geom_smooth(data=correlationDataFrame_30M_vs_5M, aes(x=deltaPSI_30M_vs_5M, deltaPSI_5M_vs_30M), method = "lm", color="darkgrey", se=FALSE) +
+  ggrastr::geom_point_rast(data=correlationDataFrame_30M_vs_5M_sig, aes(x=deltaPSI_30M_vs_5M_sig, y=deltaPSI_5M_vs_30M_sig), color="black") +
+  geom_smooth(data=correlationDataFrame_30M_vs_5M_sig, aes(x=deltaPSI_30M_vs_5M_sig, y=deltaPSI_5M_vs_30M_sig),method = "lm", color="black", se=FALSE) +
+  geom_hline(yintercept=0, size=.5, linetype="dashed") +
+  geom_vline(xintercept=0, size=.5, linetype="dashed") +
+  geom_abline(xintercept=0, slope=1, linetype="dashed", size=.75, color="firebrick2") +
+  coord_fixed(ratio = 1) +
+  xlab("\u0394\u03A8 30 M reads") +
+  ylab("\u0394\u03A8 5 M reads") +
+  theme_bw() +
+  theme(plot.title = element_text(face = "bold"))
+
+
+# correlation data frame 30M vs 2.5M reads
+correlationDataFrame_30M_vs_2.5M <- data.frame(deltaPSI_30M_vs_2.5M, deltaPSI_2.5M_vs_30M)
+correlationDataFrame_30M_vs_2.5M_sig <- data.frame(deltaPSI_30M_vs_2.5M_sig, deltaPSI_2.5M_vs_30M_sig)
+
+sharedRegulation_scatterPlot6 = ggplot(data=correlationDataFrame_30M_vs_2.5M, aes(x=deltaPSI_30M_vs_2.5M, deltaPSI_2.5M_vs_30M)) +
+  stat_cor(label.x.npc = .3, label.y.npc =1) +
+  ggrastr::geom_point_rast(alpha=0.36, color="darkgrey") +
+  geom_smooth(data=correlationDataFrame_30M_vs_2.5M, aes(x=deltaPSI_30M_vs_2.5M, deltaPSI_2.5M_vs_30M), method = "lm", color="darkgrey", se=FALSE) +
+  ggrastr::geom_point_rast(data=correlationDataFrame_30M_vs_2.5M_sig, aes(x=deltaPSI_30M_vs_2.5M_sig, y=deltaPSI_2.5M_vs_30M_sig), color="black") +
+  geom_smooth(data=correlationDataFrame_30M_vs_2.5M_sig, aes(x=deltaPSI_30M_vs_2.5M_sig, y=deltaPSI_2.5M_vs_30M_sig),method = "lm", color="black", se=FALSE) +
+  geom_hline(yintercept=0, size=.5, linetype="dashed") +
+  geom_vline(xintercept=0, size=.5, linetype="dashed") +
+  geom_abline(xintercept=0, slope=1, linetype="dashed", size=.75, color="firebrick2") +
+  coord_fixed(ratio = 1) +
+  xlab("\u0394\u03A8 30 M reads") +
+  ylab("\u0394\u03A8 2.5 M reads") +
+  theme_bw() +
+  theme(plot.title = element_text(face = "bold"))
+
+
+# correlation data frame 30M vs 5M reads
+correlationDataFrame_30M_vs_1M <- data.frame(deltaPSI_30M_vs_1M, deltaPSI_1M_vs_30M)
+correlationDataFrame_30M_vs_1M_sig <- data.frame(deltaPSI_30M_vs_1M_sig, deltaPSI_1M_vs_30M_sig)
+
+sharedRegulation_scatterPlot7 = ggplot(data=correlationDataFrame_30M_vs_1M, aes(x=deltaPSI_30M_vs_1M, deltaPSI_1M_vs_30M)) +
+  stat_cor(label.x.npc = .3, label.y.npc =1) +
+  ggrastr::geom_point_rast(alpha=0.36, color="darkgrey") +
+  geom_smooth(data=correlationDataFrame_30M_vs_1M, aes(x=deltaPSI_30M_vs_1M, deltaPSI_1M_vs_30M), method = "lm", color="darkgrey", se=FALSE) +
+  ggrastr::geom_point_rast(data=correlationDataFrame_30M_vs_1M_sig, aes(x=deltaPSI_30M_vs_1M_sig, y=deltaPSI_1M_vs_30M_sig), color="black") +
+  geom_smooth(data=correlationDataFrame_30M_vs_1M_sig, aes(x=deltaPSI_30M_vs_1M_sig, y=deltaPSI_1M_vs_30M_sig),method = "lm", color="black", se=FALSE) +
+  geom_hline(yintercept=0, size=.5, linetype="dashed") +
+  geom_vline(xintercept=0, size=.5, linetype="dashed") +
+  geom_abline(xintercept=0, slope=1, linetype="dashed", size=.75, color="firebrick2") +
+  coord_fixed(ratio = 1) +
+  xlab("\u0394\u03A8 30 M reads") +
+  ylab("\u0394\u03A8 1 M reads") +
+  theme_bw() +
+  theme(plot.title = element_text(face = "bold"))
+
+sharedRegulation_scatterPlot1
+sharedRegulation_scatterPlot2
+sharedRegulation_scatterPlot3
+sharedRegulation_scatterPlot4
+sharedRegulation_scatterPlot5
+sharedRegulation_scatterPlot6
+sharedRegulation_scatterPlot7
+
+
+ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/sharedRegulation_30M_10M_readDepth.pdf", plot = sharedRegulation_scatterPlot4, width = 5.65, height = 5.65, units = "cm")
+```
+
+
+# 5 - Influence on the distribution of alternative splice events types (Fig 5)
+
+Since there are alternative splicing events with different numbers of junctions, they are treated differently in terms of significance. 
+
+Alternative splicing events with two junctions (A3SS, A5SS, AFE, ALE, IR) are considered significantly regulated if at least one junction has a dPSI of at least 0.05 and a probability changing value of at least 0.9. Events with 4 junctions (CE and MXE) are considered significantly regulated if either both junctions starting from C1 or both junctions starting from C2 fulfill the regulation criteria. 
+
+```{r}
+# load voila modulize files 
+modDir = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/U2AF2/Modulize/read_depth"
+modFiles = list.files(path = modDir, pattern = ".tsv")
+setwd(modDir)
+
+# list events with 2 Junctions separately for each read depth 
+events_2J = lapply(modFiles[1:40], loadFiles)
+events_4J = lapply(modFiles[41:56], loadFiles)
+
+# add pseudo column to ensure that column for dPSI and probability changing
+# is at same position for all event types
+# for AFEs and ALEs this is different
+indToChange_2J = c(3, 4, 8, 9, 13, 14, 18, 19, 23, 24,
+                   28, 29, 33, 34, 38, 39)
+indToChange_4J = c(2, 4, 6, 8, 10, 12, 14, 16)
+
+for (index in indToChange_2J) {
+  events_2J[[index]] <- data.frame(pseudo = NA, events_2J[[index]])
+}
+
+for (index in indToChange_4J) {
+  events_4J[[index]] <- data.frame(pseudo = NA, events_4J[[index]])
+}
+
+# function to filter out significant events with 2 junctions
+# significant events (dpsi >= 0.05, probability changing >= 0.9)
+filter2JEvents <- function(eventTable) {
+  names(eventTable)[21] <- "CT.KD_median_dpsi"
+  names(eventTable)[22] <- "CT.KD_probability_changing"
+  eventTable = eventTable[abs(as.numeric(eventTable$CT.KD_median_dpsi)) >= 0.05 & eventTable$CT.KD_probability_changing >= 0.9, ] 
+  eventTable %>% group_by(event_id) %>% slice(1)
+  }
+
+# function to filter out significant events with 4 junctions
+filter4JEvents <- function(eventTable) {
+  names(eventTable)[21] <- "CT.KD_median_dpsi"
+  names(eventTable)[22] <- "CT.KD_probability_changing"
+  eventTable %>% 
+    group_by(event_id) %>%
+    summarise(significant = (((abs(as.numeric(CT.KD_median_dpsi[1])) >= 0.05 & CT.KD_probability_changing[1] >= 0.9) &
+    (abs(as.numeric(CT.KD_median_dpsi[2])) >= 0.05 & CT.KD_probability_changing[2] >= 0.9)) |
+  ((abs(as.numeric(CT.KD_median_dpsi[3])) >= 0.05 & CT.KD_probability_changing[3] >= 0.9) &
+    (abs(as.numeric(CT.KD_median_dpsi[4])) >= 0.05 & CT.KD_probability_changing[4] >= 0.9)))) %>%
+    filter(significant == TRUE)
+}
+
+# filter out significant events
+significantEvents_2J = lapply(events_2J, filter2JEvents)
+significantEvents_4J = lapply(events_4J, filter4JEvents)
+
+names(significantEvents_2J) = c("A3SS_1M", "A5SS_1M", "AFE_1M", "ALE_1M", "IR_1M",
+                                "A3SS_2_5M", "A5SS_2_5M", "AFE_2_5M", "ALE_2_5M", "IR_2_5M",
+                                "A3SS_5M", "A5SS_5M", "AFE_5M", "ALE_5M", "IR_5M",
+                                "A3SS_10M", "A5SS_10M", "AFE_10M", "ALE_10M", "IR_10M",
+                                "A3SS_15M", "A5SS_15M", "AFE_15M", "ALE_15M", "IR_15M",
+                                "A3SS_20M", "A5SS_20M", "AFE_20M", "ALE_20M", "IR_20M",
+                                "A3SS_25M", "A5SS_25M", "AFE_25M", "ALE_25M", "IR_25M",
+                                "A3SS_30M", "A5SS_30M", "AFE_30M", "ALE_30M", "IR_30M")
+names(significantEvents_4J) = c("CE_1M", "MXE_1M", "CE_2_5M", "MXE_2_5M", "CE_5M", "MXE_5M", "CE_10M", "MXE_10M", 
+                                "CE_15M", "MXE_15M", "CE_20M", "MXE_20M", "CE_25M", "MXE_25M", "CE_30M", "MXE_30M")
+
+# data frames with number of event types for each read depth
+nEventTypes_1M_df = data.frame(event = c("A3SS", "A5SS", "AFE", "ALE", "IR", "CE", "MXE"), 
+                               n = c(nrow(significantEvents_2J$A3SS_1M), 
+                                     nrow(significantEvents_2J$A5SS_1M),
+                                     nrow(significantEvents_2J$AFE_1M), 
+                                     nrow(significantEvents_2J$ALE_1M), 
+                                     nrow(significantEvents_2J$IR_1M), 
+                                     nrow(significantEvents_4J$CE_1M),
+                                     nrow(significantEvents_4J$MXE_1M)))
+
+# significantEvents_2J$A5SS_1M # A5SS_1M führt zu NULL ?? --> es gibt keine signifikanten spleißereignisse
+
+nEventTypes_2_5M_df = data.frame(event = c("A3SS", "A5SS", "AFE", "ALE", "IR", "CE", "MXE"), 
+                                 n = c(nrow(significantEvents_2J$A3SS_2_5M), 
+                                       nrow(significantEvents_2J$A5SS_2_5M),
+                                       nrow(significantEvents_2J$AFE_2_5M), 
+                                       nrow(significantEvents_2J$ALE_2_5M), 
+                                       nrow(significantEvents_2J$IR_2_5M), 
+                                       nrow(significantEvents_4J$CE_2_5M),
+                                       nrow(significantEvents_4J$MXE_2_5M)))
+
+nEventTypes_5M_df = data.frame(event = c("A3SS", "A5SS", "AFE", "ALE", "IR", "CE", "MXE"), 
+                               n = c(nrow(significantEvents_2J$A3SS_5M), 
+                                     nrow(significantEvents_2J$A5SS_5M),
+                                     nrow(significantEvents_2J$AFE_5M), 
+                                     nrow(significantEvents_2J$ALE_5M), 
+                                     nrow(significantEvents_2J$IR_5M), 
+                                     nrow(significantEvents_4J$CE_5M),
+                                     nrow(significantEvents_4J$MXE_5M)))
+
+nEventTypes_10M_df = data.frame(event = c("A3SS", "A5SS", "AFE", "ALE", "IR", "CE", "MXE"), 
+                                n = c(nrow(significantEvents_2J$A3SS_10M), 
+                                      nrow(significantEvents_2J$A5SS_10M),
+                                      nrow(significantEvents_2J$AFE_10M), 
+                                      nrow(significantEvents_2J$ALE_10M), 
+                                      nrow(significantEvents_2J$IR_10M), 
+                                      nrow(significantEvents_4J$CE_10M),
+                                      nrow(significantEvents_4J$MXE_10M)))
+
+nEventTypes_15M_df = data.frame(event = c("A3SS", "A5SS", "AFE", "ALE", "IR", "CE", "MXE"), 
+                                n = c(nrow(significantEvents_2J$A3SS_15M), 
+                                      nrow(significantEvents_2J$A5SS_15M),
+                                      nrow(significantEvents_2J$AFE_15M), 
+                                      nrow(significantEvents_2J$ALE_15M), 
+                                      nrow(significantEvents_2J$IR_15M), 
+                                      nrow(significantEvents_4J$CE_15M),
+                                      nrow(significantEvents_4J$MXE_15M)))
+
+nEventTypes_20M_df = data.frame(event = c("A3SS", "A5SS", "AFE", "ALE", "IR", "CE", "MXE"), 
+                                n = c(nrow(significantEvents_2J$A3SS_20M), 
+                                      nrow(significantEvents_2J$A5SS_20M),
+                                      nrow(significantEvents_2J$AFE_20M), 
+                                      nrow(significantEvents_2J$ALE_20M), 
+                                      nrow(significantEvents_2J$IR_20M), 
+                                      nrow(significantEvents_4J$CE_20M),
+                                      nrow(significantEvents_4J$MXE_20M)))
+
+nEventTypes_25M_df = data.frame(event = c("A3SS", "A5SS", "AFE", "ALE", "IR", "CE", "MXE"), 
+                                n = c(nrow(significantEvents_2J$A3SS_25M), 
+                                      nrow(significantEvents_2J$A5SS_25M),
+                                      nrow(significantEvents_2J$AFE_25M), 
+                                      nrow(significantEvents_2J$ALE_25M), 
+                                      nrow(significantEvents_2J$IR_25M), 
+                                      nrow(significantEvents_4J$CE_25M),
+                                      nrow(significantEvents_4J$MXE_25M)))
+
+nEventTypes_30M_df = data.frame(event = c("A3SS", "A5SS", "AFE", "ALE", "IR", "CE", "MXE"), 
+                                n = c(nrow(significantEvents_2J$A3SS_30M), 
+                                      nrow(significantEvents_2J$A5SS_30M),
+                                      nrow(significantEvents_2J$AFE_30M), 
+                                      nrow(significantEvents_2J$ALE_30M), 
+                                      nrow(significantEvents_2J$IR_30M), 
+                                      nrow(significantEvents_4J$CE_30M),
+                                      nrow(significantEvents_4J$MXE_30M)))
+
+# combine event type results of each read depth into one data frame
+nEventTypes_1M_df$readDepth = "01M"
+nEventTypes_2_5M_df$readDepth = "025M"
+nEventTypes_5M_df$readDepth = "05M"
+nEventTypes_10M_df$readDepth = "10M"
+nEventTypes_15M_df$readDepth = "15M"
+nEventTypes_20M_df$readDepth = "20M"
+nEventTypes_25M_df$readDepth = "25M"
+nEventTypes_30M_df$readDepth = "30M"
+
+nEventTypes_df = rbind(nEventTypes_1M_df, nEventTypes_2_5M_df, nEventTypes_5M_df, nEventTypes_10M_df,
+                       nEventTypes_15M_df, nEventTypes_20M_df, nEventTypes_25M_df, nEventTypes_30M_df)
+                              
+# number of event types for each read depth as bar charts
+nEventTypes_cols = 
+  ggplot(nEventTypes_df, aes(x = event, y = n, fill = readDepth)) +
+  geom_col(position = "dodge") +
+  xlab("event type") +
+  ylab("# events") +
+  scale_fill_manual(name = "read depth [106]", values = c(lighten("#36716E", 0.95), lighten("#36716E", 0.8),
+                                                          lighten("#36716E", 0.6), lighten("#36716E", 0.4),
+                                                          lighten("#36716E", 0.2), "#36716E", darken("#36716E", 0.2),
+                                                          darken("#36716E", 0.4)), 
+                    labels = c("1", "2.5", "5", "10", "15", "20", "25", "30")) +
+  ggtitle("B")
+ 
+# fraction of event types for each read depth as stacked bar chart 
+# amount of events log10 transformed
+nEventTypes_StackedBarChart = 
+  ggplot(nEventTypes_df, aes(x = readDepth, y = n, fill = event)) +
+  geom_col(position = "fill") +
+  scale_y_log10() +
+  xlab("read depth [106]") +
+  ylab("# events (log10)") +
+  #scale_x_discrete(labels = c("36", "50", "75", "100")) +
+  scale_fill_brewer(palette = "YlGnBu", name = "Event") +
+  ggtitle("B")
+
+nEventTypes_cols
+nEventTypes_StackedBarChart
+
+'ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/nEventTypes_RD.pdf", plot = nEventTypes_cols, width = 16.5, height = 7, units = "cm")
+ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/distrEventTypes_RD.pdf", plot = nEventTypes_StackedBarChart, width = 6, height = 7, units = "cm")'
+# was ist hier durcheinander geraten???
+```
+
+
+# Session info
+
+```{r}
+sessionInfo()
+```
