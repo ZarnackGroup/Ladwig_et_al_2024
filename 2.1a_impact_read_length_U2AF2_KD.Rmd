@@ -31,7 +31,7 @@ library(viridis)
 probabilityThreshold = 0.9
 
 # theme
-source("C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/theme_paper.R")
+source(".../theme_paper.R")
 theme_set(theme_paper())
 ```
 
@@ -112,7 +112,7 @@ The influence of read length on read alignment is determined by plotting the fra
 
 ```{r}
 # load star log files 
-StarDir = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/U2AF2/STAR"
+StarDir = ".../STAR_log_output"
 StarLogFiles=list.files(path=StarDir)
 setwd(StarDir)
 StarLogFiles = lapply(StarLogFiles, read.delim)
@@ -202,7 +202,6 @@ StarReport_StackedBarChart = ggarrange(
   ncol = 4, nrow = 1
   )
 
-StarReport_StackedBarChart = annotate_figure(StarReport_StackedBarChart, top = text_grob("Influence on read alignment", size = 12, just = "centre", face = "bold"))
 StarReport_StackedBarChart
 ```
 
@@ -212,7 +211,7 @@ The influence of read length on LSV detection is determined by counting the LSV 
 
 ```{r}
 # load dPSI TSV files from MAJIQ Quantifier as list
-dpsiDir = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/U2AF2/MAJIQ/read_length"
+dpsiDir = ".../MAJIQ_TSV_files"
 dpsiFiles=list.files(path = dpsiDir, pattern = ".tsv")
 setwd(dpsiDir)
 
@@ -371,9 +370,9 @@ nSignificantLSVs_bar_absolute =
 # create data frame with a column for the read length
 # and a column indicating whether the associated LSV is significant or not 
 significantLSVs_df_relative = data.frame(comparison=c(rep("036", nrow(dPSIs[[1]])),
-                                                   rep("050", nrow(dPSIs[[2]])), 
-                                                   rep("075", nrow(dPSIs[[3]])), 
-                                                   rep("100", nrow(dPSIs[[4]]))),
+                                                      rep("050", nrow(dPSIs[[2]])), 
+                                                      rep("075", nrow(dPSIs[[3]])), 
+                                                      rep("100", nrow(dPSIs[[4]]))),
                                       significant=c(dPSIs[[1]]$significant,
                                                     dPSIs[[2]]$significant, 
                                                     dPSIs[[3]]$significant, 
@@ -428,7 +427,7 @@ significantLSVs_all = list("36" = c(significantLSVs_36), "50" = c(significantLSV
                            "75" = c(significantLSVs_75), "100" = c(significantLSVs_100))
 
 # upset plot
-pdf(file="C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/upset_read_length.pdf", width=3.6, height=3) 
+pdf(file=".../upset_read_length.pdf", width=3.6, height=3) 
 upset(fromList(significantLSVs_all), 
       order.by = "freq", 
       sets.bar.color = c("#FAD8B4", "#F7B56D", "#DE872A", "#C85813"), 
@@ -834,8 +833,6 @@ sharedRegulation_scatterPlot6 = ggplot(data=correlationDataFrame_50_vs_36, aes(x
   ylab("\u0394\u03A8 36 nt read length") +
   theme_bw() +
   theme(plot.title = element_text(face = "bold"))
-
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/sharedRegulation_100_50_readLength.pdf", plot = sharedRegulation_scatterPlot2, width = 5.65, height = 5.65, units = "cm")
 ```
 
 
@@ -847,7 +844,7 @@ Alternative splicing events with two junctions (A3SS, A5SS, AFE, ALE, IR) are co
 
 ```{r}
 # load voila modulize files 
-modDir = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/U2AF2/Modulize/read_length"
+modDir = ".../Modulizer_TSV_files"
 modFiles = list.files(path = modDir, pattern = ".tsv")
 setwd(modDir)
 
@@ -975,125 +972,8 @@ numberOfEventTypes_StackedBarChart =
 
 numberOfEventTypes_cols
 numberOfEventTypes_StackedBarChart
-
-# save plots
-#ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/nEventTypes_RL.pdf", plot = numberOfEventTypes_cols, width = 11, height = 7, units = "cm")
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/distrEventTypes_RL.pdf", plot = numberOfEventTypes_StackedBarChart, width = 4.8, height = 7, units = "cm")
-
-numberOfEventTypes_36_df
 ```
 
-
-```{r}
-#################################
-# fraction of significant events
-#################################
-
-# pseudo column for events with 2 junctions
-# to ensure the same structure of the data frames
-for (i in 9:16){
-  events_2J[[i]] <- data.frame(pseudoCol = NA, events_2J[[i]])
-}
-
-# pseudo column for events with 4 junctions
-for (i in 5:8){
-  events_4J[[i]] <- data.frame(pseudoCol = NA, events_4J[[i]])
-}
-
-# function to filter significant events with 2 junctions
-# significant events (dpsi >= 0.05, probability changing >= 0.9)
-filter2JEvents <- function(eventTable) {
-  names(eventTable)[21] = "CT.KD_median_dpsi"
-  names(eventTable)[22] = "CT.KD_probability_changing"
-  # add new column "significant" for each read length which could be TRUE/FALSE
-  eventTable$significant = abs(as.numeric(eventTable$CT.KD_median_dpsi)) >= 0.05 & 
-    eventTable$CT.KD_probability_changing >= 0.9 
-  # select only one entry for each event id (if for an entry significant = TRUE, it will be taken)
-  eventTable = eventTable %>%
-    group_by(event_id) %>%
-    # sort entries in descending order to ensure that entries with significant = TRUE are selected in any case
-    arrange(desc((significant))) %>%
-    slice(1)
-}
-
-# function to filter out significant events with 4 junctions
-filter4JEvents <- function(eventTable) {
-  names(eventTable)[21] <- "CT.KD_median_dpsi"
-  names(eventTable)[22] <- "CT.KD_probability_changing"
-  eventTable$significant = (((abs(as.numeric(eventTable$CT.KD_median_dpsi)) >= 0.05 & eventTable$CT.KD_probability_changing >= 0.9) &
-    (abs(as.numeric(eventTable$CT.KD_median_dpsi)) >= 0.05 & eventTable$CT.KD_probability_changing >= 0.9)) |
-  ((abs(as.numeric(eventTable$CT.KD_median_dpsi)) >= 0.05 & eventTable$CT.KD_probability_changing >= 0.9) &
-    (abs(as.numeric(eventTable$CT.KD_median_dpsi)) >= 0.05 & eventTable$CT.KD_probability_changing >= 0.9)))
-  eventTable = eventTable %>% 
-    group_by(event_id) %>%
-    arrange(desc((significant))) %>%
-    slice(1)
-}
-
-# filter significant events
-filteredEvents_2J = lapply(events_2J, filter2JEvents)
-filteredEvents_4J = lapply(events_4J, filter4JEvents)
-
-# significant events for each read length
-print("# significant events with 2 junctions")
-for (i in 1:length(filteredEvents_2J)) {
-  print(i)
-  print(table(filteredEvents_2J[[i]]$significant))
-}
-
-print("# significant events with 4 junctions")
-for (i in 1:length(filteredEvents_4J)) {
-  print(i)
-  print(table(filteredEvents_4J[[i]]$significant))
-}
-
-# In group 454: `event_id = "ENSG00000067225.21_2_AI_3"`.
-# was ist AI
-```
-
-```{r}
-# create data frame with a column for the read length
-# and a column indicating whether the associated event is significant or not 
-# !data frame so ausbauen, dass es noch spalte für den event typen gibt und dann danach gruppieren
-# !nicht rep 4, sondern mal die anzahl
-significantEvents_df = data.frame(comparison=c(rep("036", nrow(filteredEvents_2J[[1]])),
-                                               rep("050", nrow(filteredEvents_2J[[2]])), 
-                                               rep("075", nrow(filteredEvents_2J[[3]])), 
-                                               rep("100", nrow(filteredEvents_2J[[4]]))),
-                                  significant=c(filteredEvents_2J[[1]]$significant,
-                                                filteredEvents_2J[[2]]$significant, 
-                                                filteredEvents_2J[[3]]$significant, 
-                                                filteredEvents_2J[[4]]$significant)
-                                  )
-
-# differ between the significance of events of different read lengths to plot them in different colors 
-for (i in 1:nrow(significantEvents_df)){
-  if (significantEvents_df[i, "comparison"] == "036" && significantEvents_df[i, "significant"] == TRUE){
-    significantEvents_df[i, "significant"] = "TRUE read length 036"
-  }
-  if (significantEvents_df[i, "comparison"] == "050" && significantEvents_df[i, "significant"] == TRUE){
-    significantEvents_df[i, "significant"] = "TRUE read length 050"
-  }
-  if (significantEvents_df[i, "comparison"] == "075" && significantEvents_df[i, "significant"] == TRUE){
-    significantEvents_df[i, "significant"] = "TRUE read length 075"
-  }
-  if (significantEvents_df[i, "comparison"] == "100" && significantEvents_df[i, "significant"] == TRUE){
-    significantEvents_df[i, "significant"] = "TRUE read length 100"
-  }
-}
-
-# stacked bar chart showing fraction of significant events among all detected events for each read length   
-significantEvents_fraction = ggplot(data=significantEvents_df, aes(x = comparison, fill = factor(significant))) +
-  geom_bar(position = "fill", show.legend = FALSE) +
-  xlab("read length [nt]") +
-  ylab("fraction of significant detected events") +
-  coord_cartesian(ylim = c(0, 0.15)) +
-  scale_fill_manual(name= "significant", values = c("lightgrey", "#FAD8B4", "#F7B56D", "#DE872A", "#C85813"), labels = c("FALSE", "TRUE", "TRUE", "TRUE", "TRUE")) +
-  scale_x_discrete(labels = c("36", "50", "75", "100")) +
-  ggtitle("A3SS")
-
-significantEvents_fraction
-```
 
 # Session info
 
