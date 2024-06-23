@@ -197,6 +197,7 @@ StackedBarChart_nJunctions = ggplot(nJunctions_df, aes(x = readLength, y = Freq)
 StackedBarChart_nJunctions
 ```
 
+
 # 2 - Influence on the significance of LSVs (Supplementary Figure 2)
 
 Influence of read length on the significance of LSVs is determined by plotting the fraction of significantly regulated LSVs detected for each read length. LSVs are considered significant if dPSI is at least 0.05 and probability changing is at least 0.9. 
@@ -222,6 +223,7 @@ scatter_readLength_100 = ggplot(dPSIs[[4]], aes(x = maxDeltaPSI, y = maxProb)) +
                          xlab("\u0394\u03A8") 
 scatter_readLength_100
 ```
+
 ## Number and fraction of detected significant LSVs 
 
 ```{r}
@@ -310,6 +312,7 @@ nSignificantLSVs_bar_relative = ggplot(data=significantLSVs_df_relative, aes(x =
 
 nSignificantLSVs_bar_relative
 ```
+
 ## Shared significant LSVs between different datasets (Supplementary Figure 2B)
 
 ```{r}
@@ -339,6 +342,8 @@ upset(fromList(significantLSVs_all),
       mainbar.y.label = "intersection")
 dev.off()
 ```
+
+
 # 3 - Influence on size of detected splicing changes (Supplementary Figure 3)
 
 Influence on the size of detected splicing changes is determined by plotting the cumulative fraction of dPSIs and probability changing values for each read length. 
@@ -398,6 +403,7 @@ ecdf_prob_changing = ggplot() +
 ecdf_deltaPSI
 ecdf_prob_changing
 ```
+
 ## Shared binary regulation between the different datasets
 
 Only binary LSVs are considered to ensure that the dPSI value of the same junction is taken from both data sets. 
@@ -744,7 +750,9 @@ sharedRegulation_scatterPlot6 = ggplot(data=correlationDataFrame_50_vs_36, aes(x
 sharedRegulation_scatterPlot2
 ```
 
+
 # Session info
+
 ```{r}
 sessionInfo()
 ```
