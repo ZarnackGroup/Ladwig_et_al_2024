@@ -29,7 +29,7 @@ library(halfmoon)
 probabilityThreshold = 0.9
 
 # MY THEME
-source("C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/theme_paper.R")
+source(".../theme_paper.R")
 theme_set(theme_paper())
 
 # MY FUNCTIONS
@@ -92,7 +92,7 @@ extractMaxProbs <- function(x) {
 
 # 2 samples
 # load voila files as list
-two_samples_Dir = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/endodermal_cell_vs_H1_cell_line/MAJIQ/2_samples/"
+two_samples_Dir = ".../MAJIQ_TSV_files_2_samples"
 
 two_samples_files = list.files(path = two_samples_Dir, pattern = ".tsv")
 setwd(two_samples_Dir)
@@ -105,7 +105,7 @@ names(two_samples_dfs) = c("sample_1_2", "sample_1_3", "sample_2_3")
 
 # 3 samples
 # load voila files as list
-three_samples_Dir = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/endodermal_cell_vs_H1_cell_line/MAJIQ/3_samples"
+three_samples_Dir = ".../MAJIQ_TSV_files_3_samples"
 
 three_samples_files = list.files(path = three_samples_Dir, pattern = ".tsv")
 setwd(three_samples_Dir)
@@ -162,9 +162,6 @@ nLSVs_sampleSize = ggplot(nLSVs_df, aes(nSamples, y = nLSVs))+
   geom_text(aes(label=nLSVs), position=position_dodge(width=0.9), vjust=1)
 
 nLSVs_sampleSize
-
-# save ggplots
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/nLSVs_sampleSize.pdf", plot = nLSVs_sampleSize, width = 2.46, height = 6, units = "cm")
 ```
 
 
@@ -220,9 +217,6 @@ StackedBarChart_nJunctions = ggplot(nJunctions_df, aes(x = n_samples, y = Freq))
   ggtitle("B") 
 
 StackedBarChart_nJunctions
-
-# save ggplots
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/complexityLSVs_sampleSize.pdf", plot = StackedBarChart_nJunctions, width = 2.26, height = 6, units = "cm")
 ```
 
 
@@ -326,11 +320,6 @@ nSignificantLSVs_bar_absolute = ggplot(nSignificantLSVs_df_absolute, aes(nSample
   geom_text(aes(label=nSignificantLSVs), position=position_dodge(width=0.9), vjust=1)
   
 nSignificantLSVs_bar_absolute
-
-
-# save plots
-ggsave(filename = "nSignficantLSVs_sample_size_absolute.pdf", plot = nSignificantLSVs_bar_absolute, width = 2.2, height = 6, units = "cm", path = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots")
-ggsave(filename = "nSignficantLSVs_sample_size_relative.pdf", plot = nSignificantLSVs_bar_relative, width = 2.41, height = 6, units = "cm", path = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots")
 ```
 
 ## Shared significant regulated LSVs between the different sample sizes (Fig 3G)
@@ -415,11 +404,6 @@ ecdf_probChanging = ggplot() +
 
 ecdf_deltaPSI
 ecdf_probChanging
-
-# save ggplots
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/ecdf_dPSI_sampleSize.pdf", plot = ecdf_deltaPSI, width = 4.2, height = 4.2, units = "cm")
-
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/ecdf_probChanging_sampleSize.pdf", plot = ecdf_probChanging, width = 4.2, height = 4.2, units = "cm")
 ```
 
 ```{r, echo=FALSE,warning=FALSE,message=FALSE,error=FALSE,fig.keep='all'}
@@ -854,15 +838,6 @@ sharedRegulation_scatterPlot3
 sharedRegulation_scatterPlot4
 sharedRegulation_scatterPlot5
 sharedRegulation_scatterPlot6
-
-'# save ggplots
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/sharedRehulation_100_75.pdf", plot = U2AF2_sharedRegulation_scatterPlot1)
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/sharedRehulation_100_50.pdf", plot = U2AF2_sharedRegulation_scatterPlot2)
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/sharedRehulation_100_36.pdf", plot = U2AF2_sharedRegulation_scatterPlot3)
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/sharedRehulation_75_50.pdf", plot = U2AF2_sharedRegulation_scatterPlot4)
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/sharedRehulation_50_36.pdf", plot = U2AF2_sharedRegulation_scatterPlot5)'
-
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/sharedRegulation_samples_12_vs_123_sampleSize.pdf", plot = sharedRegulation_scatterPlot3, width = 5.65, height = 5.65, units = "cm")
 ```
 
 
@@ -874,7 +849,7 @@ Alternative splicing events with two junctions (A3SS, A5SS, AFE, ALE, IR) are co
 
 ```{r}
 # load voila modulize files 
-modDir = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/endodermal_cell_vs_H1_cell_line/Modulize"
+modDir = ".../Modulize_TSV_files"
 modFiles = list.files(path = modDir, pattern = ".tsv")
 setwd(modDir)
 modFiles
@@ -998,216 +973,6 @@ nEventTypes_StackedBarChart =
 
 nEventTypes_cols
 nEventTypes_StackedBarChart
-
-# save plots 
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/nEventTypes_SS.pdf", plot = nEventTypes_cols, width = 11, height = 7, units = "cm")
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/distrEventTypes_SS.pdf", plot = nEventTypes_StackedBarChart, width = 4.8, height = 7, units = "cm")
-
-# wieso sind hier zwei NA Werte? wie kommen die zustande?
-# entsprechende Zeilen ausprinten lassen
-'print(sum(is.na(filteredEvents_2J[[20]]$significant)))
-rows_with_na <- subset(filteredEvents_2J[[20]], is.na(significant))
-print(rows_with_na)'
-```
-
-```{r}
-#################################
-# fraction of significant events
-#################################
-
-# pseudo column for AFE events with 2 junctions
-# to ensure the same structure of the data frames
-'for (i in 9:16){
-  events_2J[[i]] <- data.frame(pseudoCol = NA, events_2J[[i]])
-}
-
-# pseudo column for MXE events with 4 junctions
-for (i in 5:8){
-  events_4J[[i]] <- data.frame(pseudoCol = NA, events_4J[[i]])
-}'
-
-# function to filter significant events with 2 junctions
-# significant events (dpsi >= 0.05, probability changing >= 0.9)
-filter2JEvents <- function(eventTable) {
-  names(eventTable)[21] = "CT.KD_median_dpsi"
-  names(eventTable)[22] = "CT.KD_probability_changing"
-  # add new column "significant" for each replicate number which could be TRUE/FALSE
-  eventTable$significant = abs(as.numeric(eventTable$CT.KD_median_dpsi)) >= 0.05 & 
-    eventTable$CT.KD_probability_changing >= 0.9 
-  # select only one entry for each event id (if for an entry significant = TRUE, it will be taken)
-  eventTable = eventTable %>%
-    group_by(event_id) %>%
-    # sort entries in descending order to ensure that entries with significant = TRUE are selected in any case
-    arrange(desc((significant))) %>%
-    slice(1)
-}
-
-# function to filter out significant events with 4 junctions
-filter4JEvents <- function(eventTable) {
-  names(eventTable)[21] <- "CT.KD_median_dpsi"
-  names(eventTable)[22] <- "CT.KD_probability_changing"
-  eventTable$significant = (((abs(as.numeric(eventTable$CT.KD_median_dpsi)) >= 0.05 & eventTable$CT.KD_probability_changing >= 0.9) &
-    (abs(as.numeric(eventTable$CT.KD_median_dpsi)) >= 0.05 & eventTable$CT.KD_probability_changing >= 0.9)) |
-  ((abs(as.numeric(eventTable$CT.KD_median_dpsi)) >= 0.05 & eventTable$CT.KD_probability_changing >= 0.9) &
-    (abs(as.numeric(eventTable$CT.KD_median_dpsi)) >= 0.05 & eventTable$CT.KD_probability_changing >= 0.9)))
-  eventTable = eventTable %>% 
-    group_by(event_id) %>%
-    arrange(desc((significant))) %>%
-    slice(1)
-}
-
-# filter significant events
-filteredEvents_2J = lapply(events_2J, filter2JEvents)
-filteredEvents_4J = lapply(events_4J, filter4JEvents)
-
-# significant events for each sample size
-print("# significant events with 2 junctions")
-for (i in 1:length(filteredEvents_2J)) {
-  print(i)
-  print(table(filteredEvents_2J[[i]]$significant))
-}
-
-print("# significant events with 4 junctions")
-for (i in 1:length(filteredEvents_4J)) {
-  print(i)
-  print(table(filteredEvents_4J[[i]]$significant))
-}
-
-# test if all data frames have the same number of columns
-for (i in 1:length(filteredEvents_2J)) {
-  print(ncol(filteredEvents_2J[[i]]))
-}
-for (i in 1:length(filteredEvents_4J)) {
-  print(ncol(filteredEvents_4J[[i]]))
-}
-```
-
-Immer aufschreiben, wie ich die Plots gemacht habe, die in den Figures sind! Damit ich es später noch nachvollziehen kann. 
-
-Fragen:
-- Wieso habe ich jetzt nur die IRs geplottet (bzw. generell die ganzen Eventtypen einzeln), die fraction?? Habe ich diese manuell zusammengebastelt? Wahrscheinlich ja. Wie bin ich dann auf den Durchschnitt für die 2 samples gekommen? In Affinity designer gemacht? Wahrscheinlich auch ja.
-Antwort: Habe Plots auf PC unter plots gefunden. Sind doch nicht einzeln, sondern alle events zsm in einem Plot. Wie habe ich das gemacht? Code ist warum auch immer weg. 
-
-This plot was generated individually for all event types.
-```{r}
-# create data frame with a column for the sample combination
-# and a column indicating whether the associated event is significant or not 
-significantEvents_df = data.frame(comparison=c(rep("012", nrow(filteredEvents_4J[[5]])),
-                                                   rep("013", nrow(filteredEvents_4J[[6]])), 
-                                                   rep("023", nrow(filteredEvents_4J[[7]])), 
-                                                   rep("123", nrow(filteredEvents_4J[[8]]))),
-                                      significant=c(filteredEvents_4J[[5]]$significant,
-                                                    filteredEvents_4J[[6]]$significant, 
-                                                    filteredEvents_4J[[7]]$significant, 
-                                                    filteredEvents_4J[[8]]$significant))
-
-# differ between the significance of events of different sample combinations to plot them in different colors 
-for (i in 1:nrow(significantEvents_df)){
-  if (significantEvents_df[i, "comparison"] == "012" && significantEvents_df[i, "significant"] == TRUE){
-    significantEvents_df[i, "significant"] = "TRUE replicates 012"
-  }
-  if (significantEvents_df[i, "comparison"] == "013" && significantEvents_df[i, "significant"] == TRUE){
-    significantEvents_df[i, "significant"] = "TRUE replicates 013"
-  }
-  if (significantEvents_df[i, "comparison"] == "023" && significantEvents_df[i, "significant"] == TRUE){
-    significantEvents_df[i, "significant"] = "TRUE replicates 023"
-  }
-  if (significantEvents_df[i, "comparison"] == "123" && significantEvents_df[i, "significant"] == TRUE){
-    significantEvents_df[i, "significant"] = "TRUE replicates 123"
-  }
-}
-
-# stacked bar chart showing fraction of significant events among all detected events for each sample size   
-significantEvents_fraction = ggplot(data=significantEvents_df, aes(x = comparison, fill = factor(significant))) +
-  geom_bar(position = "fill", show.legend = FALSE) +
-  xlab("event type") +
-  ylab("fraction of significant detected events [%]") +
-  coord_cartesian(ylim = c(0, 0.15)) +
-  scale_fill_manual(name= "significant", values = c("lightgrey", "#EFC4E4", "#EFC4E4", "#EFC4E4", "#C76EB1"), labels = c("FALSE", "TRUE", "TRUE", "TRUE", "TRUE")) +
-  scale_x_discrete(labels = c("12", "13", "23", "123")) +
-  ggtitle("MXE")
-
-significantEvents_fraction
-significantEvents_df
-
-filteredEvents_4J[[5]]
-```
-```{r}
-'ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/fractionEventTypes_SS.pdf", plot = significantEvents_fraction, width = 11, height = 7, units = "cm")'
-```
-There are IR events that have no dpsi values. These must be removed beforehand, as it is not possible to determine whether they are significant or not.
-```{r}
-# make all fraction bar charts in one plot
-# x stands for the mean of the different sample size combinations 
-# define event types and replicates
-event_types <- c("A3SS", "A5SS", "AFE", "ALE", "CE", "IR", "MXE")
-replicates <- c("012", "013", "023", "x" ,"123")
-
-# create df with all combinations of event types and replicates
-sig_events_df <- expand.grid(replicates = replicates, event_type = event_types)
-
-# count number of significant and not significant events for each event type and number of replicates 
-# also remove rows with NAs
-sig_2J <- list()
-sig_4J <- list()
-not_sig_2J <- list()
-not_sig_4J <- list()
-
-for (i in 1:20) {
-  sig_2J[[i]] <- sum(filteredEvents_2J[[i]]$significant == TRUE, na.rm = TRUE)
-}
-for (i in 1:8) {
-  sig_4J[[i]] <- sum(filteredEvents_4J[[i]]$significant == TRUE, na.rm = TRUE)
-}
-
-for (i in 1:20) {
-  not_sig_2J[[i]] <- sum(filteredEvents_2J[[i]]$significant == FALSE, na.rm = TRUE)
-}
-for (i in 1:8) {
-  not_sig_4J[[i]] <- sum(filteredEvents_4J[[i]]$significant == FALSE, na.rm = TRUE)
-}
-
-# add information to data frame
-# remove rows with NA in column 'significant'
-sig_events_df$significant <- c(sig_2J[[1]], sig_2J[[2]], sig_2J[[3]], mean(c(sig_2J[[1]], sig_2J[[2]], sig_2J[[3]])), sig_2J[[4]],
-                               sig_2J[[5]], sig_2J[[6]], sig_2J[[7]], mean(c(sig_2J[[5]], sig_2J[[6]], sig_2J[[7]])), sig_2J[[8]],
-                               sig_2J[[9]], sig_2J[[10]], sig_2J[[11]], mean(c(sig_2J[[9]], sig_2J[[10]], sig_2J[[11]])), sig_2J[[12]],
-                               sig_2J[[13]], sig_2J[[14]], sig_2J[[15]], mean(c(sig_2J[[13]], sig_2J[[14]], sig_2J[[15]])), sig_2J[[16]],
-                               sig_4J[[1]], sig_4J[[2]], sig_4J[[3]], mean(c(sig_4J[[1]], sig_4J[[2]], sig_4J[[3]])), sig_4J[[4]],
-                               sig_2J[[17]], sig_2J[[18]], sig_2J[[19]], mean(c(sig_2J[[17]], sig_2J[[18]], sig_2J[[19]])), sig_2J[[20]],
-                               sig_4J[[5]], sig_4J[[6]], sig_4J[[7]], mean(c(sig_4J[[5]], sig_4J[[6]], sig_4J[[7]])), sig_4J[[8]])
-
-sig_events_df$not_significant <- c(not_sig_2J[[1]], not_sig_2J[[2]], not_sig_2J[[3]], 
-                                   mean(c(not_sig_2J[[1]], not_sig_2J[[2]], not_sig_2J[[3]])), not_sig_2J[[4]],
-                                   not_sig_2J[[5]], not_sig_2J[[6]], not_sig_2J[[7]], 
-                                   mean(c(not_sig_2J[[5]], not_sig_2J[[6]], not_sig_2J[[7]])), not_sig_2J[[8]],
-                                   not_sig_2J[[9]], not_sig_2J[[10]], not_sig_2J[[11]], 
-                                   mean(c(not_sig_2J[[9]], not_sig_2J[[10]], not_sig_2J[[11]])), not_sig_2J[[12]],
-                                   not_sig_2J[[13]], not_sig_2J[[14]], not_sig_2J[[15]], 
-                                   mean(c(not_sig_2J[[13]], not_sig_2J[[14]], not_sig_2J[[15]])), not_sig_2J[[16]],
-                                   not_sig_4J[[1]], not_sig_4J[[2]], not_sig_4J[[3]], 
-                                   mean(c(not_sig_4J[[1]], not_sig_4J[[2]], not_sig_4J[[3]])), not_sig_4J[[4]],
-                                   not_sig_2J[[17]], not_sig_2J[[18]], not_sig_2J[[19]], 
-                                   mean(c(not_sig_2J[[17]], not_sig_2J[[18]], not_sig_2J[[19]])), not_sig_2J[[20]],
-                                   not_sig_4J[[5]], not_sig_4J[[6]], not_sig_4J[[7]], 
-                                   mean(c(not_sig_4J[[5]], not_sig_4J[[6]], not_sig_4J[[7]])), not_sig_4J[[8]])
-sig_events_df
-
-# Berechnen Sie den Anteil an signifikanten Ereignissen
-sig_events_df$percentage <- sig_events_df$significant / (sig_events_df$significant + sig_events_df$not_significant) * 100
-
-# Erstellen Sie ein gestapeltes Balkendiagramm für jeden Event-Typ
-fractionSigEvents = ggplot(sig_events_df, aes(x = replicates, y = percentage, fill = replicates)) +
-  geom_bar(stat = "identity") +
-  facet_wrap(~event_type, ncol = 7) +
-  ggtitle("C") +
-  ylab("fraction of significant detected events [%]") +
-  xlab("event type") +
-  scale_fill_manual(values = c("012" = "#EFC4E4", "013" = "#EFC4E4", "023" = "#EFC4E4", "123" = "#C76EB1")) 
-
-sig_events_df
-
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/fractionSigEvents_SS.pdf", plot = fractionSigEvents, width = 13.3, height = 6, units = "cm")
 ```
 
 
