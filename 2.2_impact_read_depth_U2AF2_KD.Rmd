@@ -27,7 +27,7 @@ library(ggforce)
 probabilityThreshold = 0.9
 
 # MY THEME
-source("C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/theme_paper.R")
+source(".../theme_paper.R")
 theme_set(theme_paper())
 
 # MY FUNCTIONS
@@ -102,7 +102,7 @@ The influence of read depth on LSV detection is determined by counting the LSV h
 
 ```{r, warning=FALSE,message=FALSE,error=FALSE,fig.keep='all'}
 # load dpsi tsv files as list
-dpsiDir = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/U2AF2/MAJIQ/read_depth"
+dpsiDir = ".../MAJIQ_TSV_files"
 dpsiFiles =list.files(path = dpsiDir, pattern = ".tsv")
 setwd(dpsiDir)
 
@@ -150,9 +150,6 @@ nLSVs_bar_read_depth = ggplot(data=nLSVs_df, aes(x = readDepth, y = nLSVs, fill 
   geom_text(aes(label=nLSVs), position=position_dodge(width=0.9), vjust=-0.25) 
 
 nLSVs_bar_read_depth
-
-# save ggplots
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/nLSVs_bar_read_depth.pdf", plot = nLSVs_bar_read_depth, width = 4.62, height = 6, units = "cm")
 ```
 
 # 2.2 - Influence on LSV complexity (Fig 2B)
@@ -217,9 +214,6 @@ StackedBarChart_nJunctions = ggplot(nJunctions_df, aes(x = readDepth, y = Freq))
   ggtitle("B") 
                      
 StackedBarChart_nJunctions
-
-# save ggplots
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/complexityLSVs_readDepth.pdf", plot = StackedBarChart_nJunctions, width = 4.45, height = 6, units = "cm")
 ```
 
 
@@ -364,11 +358,8 @@ nSignificantLSVs_bar_absolute = ggplot(data=nSignificantLSVs_df_absolute, aes(x 
   geom_text(aes(label=nSignificantLSVs), position=position_dodge(width=0.9), vjust=1) 
 
 nSignificantLSVs_bar_absolute 
-
-# save plots
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/significantLSVs_readDepth_absolute.pdf", plot = nSignificantLSVs_bar_absolute, width = 4.5, height = 6, units = "cm")
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/significantLSVs_readDepth_relative.pdf", plot = nSignificantLSVs_bar_relative, width = 4.48, height = 6, units = "cm")
 ```
+
 # Influence on size of detected splicing changes (Fig 4)
 
 ```{r, warning=FALSE,message=FALSE,error=FALSE,fig.keep='all'}
@@ -448,13 +439,8 @@ ecdf_prob_changing = ggplot() +
   ggtitle("B") +
   theme(legend.position="none")
 
-
 ecdf_deltaPSI
 ecdf_prob_changing 
-
-# save ggplots
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/ecdf_dPSI_readDepth.pdf", plot = ecdf_deltaPSI, width = 4.2, height = 4.2, units = "cm")
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/ecdf_probChanging_readDepth.pdf", plot = ecdf_prob_changing, width = 4.2, height = 4.2, units = "cm")
 ```
 
 ## Shared significant regulated LSVs
@@ -481,7 +467,7 @@ significantLSVs_30M = dPSIs[[8]]$lsv_id[dPSIs[[8]]$significant == TRUE]
 significantLSVs_all = list("1M" = c(significantLSVs_1M), "2.5M" = c(significantLSVs_2_5M), "5M" = c(significantLSVs_5M), "10M" = c(significantLSVs_10M),
                            "15M" = c(significantLSVs_15M), "20M" = c(significantLSVs_20M), "25M" = c(significantLSVs_25M), "30M" = c(significantLSVs_30M))
 
-pdf(file="C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/upset_read_depth.pdf", width=8, height=4.3) # or other device
+pdf(file=".../upset_read_depth.pdf", width=8, height=4.3) # or other device
 # make upset plot from this informatio
 upset(fromList(significantLSVs_all), 
       nsets = 8,
@@ -491,8 +477,8 @@ upset(fromList(significantLSVs_all),
       sets.x.label = "# LSVs", 
       mainbar.y.label = "# shared significant LSVs")
 dev.off()
-
 ```
+
 ## Shared binary regulation between the different read depths
 
 ```{r, warning=FALSE,message=FALSE,error=FALSE,fig.keep='all'}
@@ -944,9 +930,6 @@ sharedRegulation_scatterPlot4
 sharedRegulation_scatterPlot5
 sharedRegulation_scatterPlot6
 sharedRegulation_scatterPlot7
-
-
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/sharedRegulation_30M_10M_readDepth.pdf", plot = sharedRegulation_scatterPlot4, width = 5.65, height = 5.65, units = "cm")
 ```
 
 
@@ -958,7 +941,7 @@ Alternative splicing events with two junctions (A3SS, A5SS, AFE, ALE, IR) are co
 
 ```{r}
 # load voila modulize files 
-modDir = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/U2AF2/Modulize/read_depth"
+modDir = ".../Modulize_TSV_files"
 modFiles = list.files(path = modDir, pattern = ".tsv")
 setwd(modDir)
 
@@ -1027,8 +1010,6 @@ nEventTypes_1M_df = data.frame(event = c("A3SS", "A5SS", "AFE", "ALE", "IR", "CE
                                      nrow(significantEvents_2J$IR_1M), 
                                      nrow(significantEvents_4J$CE_1M),
                                      nrow(significantEvents_4J$MXE_1M)))
-
-# significantEvents_2J$A5SS_1M # A5SS_1M führt zu NULL ?? --> es gibt keine signifikanten spleißereignisse
 
 nEventTypes_2_5M_df = data.frame(event = c("A3SS", "A5SS", "AFE", "ALE", "IR", "CE", "MXE"), 
                                  n = c(nrow(significantEvents_2J$A3SS_2_5M), 
@@ -1116,8 +1097,8 @@ nEventTypes_cols =
                                                           lighten("#36716E", 0.6), lighten("#36716E", 0.4),
                                                           lighten("#36716E", 0.2), "#36716E", darken("#36716E", 0.2),
                                                           darken("#36716E", 0.4)), 
-                    labels = c("1", "2.5", "5", "10", "15", "20", "25", "30")) +
-  ggtitle("B")
+                    labels = c("1", "2.5", "5", "10", "15", "20", "25", "30")) 
++ ggtitle("B")
  
 # fraction of event types for each read depth as stacked bar chart 
 # amount of events log10 transformed
@@ -1133,10 +1114,6 @@ nEventTypes_StackedBarChart =
 
 nEventTypes_cols
 nEventTypes_StackedBarChart
-
-'ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/nEventTypes_RD.pdf", plot = nEventTypes_cols, width = 16.5, height = 7, units = "cm")
-ggsave(filename = "C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/plots/distrEventTypes_RD.pdf", plot = nEventTypes_StackedBarChart, width = 6, height = 7, units = "cm")'
-# was ist hier durcheinander geraten???
 ```
 
 
