@@ -1,0 +1,510 @@
+---
+title: "4 Metaanalysis of commonly used characteristics"
+author: "Melina"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+format: 
+  html:
+    code-fold: true
+    code-overflow: scroll
+    code-summary: "Show code"
+    code-tools: true
+    code-line-numbers: true
+    
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    toc-expand: false
+    number-sections: true
+    
+    theme: sandstone
+    fontsize: 11pt
+    linestretch: 1.5
+        
+    cap-location: margin
+    crossref:
+      fig-title: Fig
+    
+    embed-resources: true
+    link-external-newwindow: true
+    smooth-scroll: true
+    
+    execute:
+      echo: true
+      warning: false
+      cache: false
+
+---
+
+```{r}
+library(httr)
+library(jsonlite)
+library(tidyverse)
+library(knitr)
+
+theme_set(theme_bw())
+out <- "/Users/melinaklostermann/Documents/projects/xx_students/Annika_majiq_test/Ladwig_et_al_2024/4-out/"
+```
+
+- This report pulls metadata information from encode for all shRNA RNAseq, total RNAseq and polyA+ RNAseqs from encode.
+- It then looks at the number of reads per sample and the mean number of reads per experiement.
+- Finally, the GO terms splicing and RNA-binding are added for the shRNA targets to specifically look at the read numbers for splicing factors.
+
+# Get metadata from encode
+
+```{r eval = F}
+# where to look
+base_url <- "https://www.encodeproject.org/"
+
+# ------------------
+# shRNA RNAseq
+# ------------------
+## see https://www.encodeproject.org/help/rest-api/ for more info
+query <- "search/?type=File&file_format=fastq&assay_title=shRNA%20RNA-seq&frame=object&limit=all"  
+## %20 encodes an empthy space
+
+# Make API request
+response <- httr::GET(paste0(base_url, query), add_headers(accept = "application/json"))
+
+# Parse JSON response
+data <- jsonlite::fromJSON(content(response, as = "text", encoding = "UTF-8"))
+
+# Most metadata is stored in data$`@graph`
+#data$`@graph`$read_count
+
+all_encode_shRNAseq_fastqs <- data$`@graph` %>% subset(status == "released")
+
+# ------------------
+# total RNAseq
+# ------------------
+
+query <- "search/?type=File&file_format=fastq&assay_title=total%20RNA-seq&frame=object&limit=all" 
+## %20 encodes an empthy space
+
+# Make API request
+response <- GET(paste0(base_url, query), add_headers(accept = "application/json"))
+
+# Parse JSON response
+data <- fromJSON(content(response, "text", encoding = "UTF-8"))
+
+
+all_encode_totalRNAseq_fastqs <- data$`@graph` %>% subset(status == "released")
+
+
+# ------------------
+# polyA RNAseq
+# ------------------
+
+query <- "search/?type=File&file_format=fastq&assay_title=polyA%20plus%20RNA-seq&frame=object&limit=all" 
+## %20 encodes an empthy space
+
+# Make API request
+response <- GET(paste0(base_url, query), add_headers(accept = "application/json"))
+
+# Parse JSON response
+data <- fromJSON(content(response, "text", encoding = "UTF-8"))
+
+
+all_encode_polyARNAseq_fastqs <- data$`@graph` %>% subset(status == "released")
+
+saveRDS(all_encode_shRNAseq_fastqs, paste0(out, "meta_shRNAseq.rds"))
+saveRDS(all_encode_totalRNAseq_fastqs, paste0(out, "meta_totalRNAseq.rds"))
+saveRDS(all_encode_polyARNAseq_fastqs, paste0(out, "meta_polyARNAseq.rds"))
+
+```
+
+
+
+```{r}
+all_encode_shRNAseq_fastqs <- readRDS(paste0(out, "meta_shRNAseq.rds"))
+all_encode_totalRNAseq_fastqs <- readRDS(paste0(out, "meta_totalRNAseq.rds"))
+all_encode_polyARNAseq_fastqs <- readRDS(paste0(out, "meta_polyARNAseq.rds"))
+
+```
+
+## Read numbers of each sample for shRNA, total and poly+ RNAseq separate
+
+```{r}
+
+# ------------------
+# plot read counts
+# ------------------
+
+ggplot(all_encode_shRNAseq_fastqs, aes(x = read_count)) +
+  geom_histogram()+
+  scale_x_log10()+
+  ggtitle("shRNA RNAseq")
+
+
+ggplot(all_encode_totalRNAseq_fastqs, aes(x = read_count)) +
+  geom_histogram()+
+  scale_x_log10()+
+  ggtitle("total RNAseq")
+
+ggplot(all_encode_polyARNAseq_fastqs, aes(x = read_count)) +
+  geom_histogram()+
+  scale_x_log10()+
+  ggtitle("polyA plus RNAseq")
+
+
+```
+
+# Adding more information
+## Adding information on the year 
+
+The year is stored inside the date created column and needs to be extracted.
+
+```{r}
+# -------------------
+# add year info 
+# -------------------
+
+all_encode_shRNAseq_fastqs <- all_encode_shRNAseq_fastqs %>% 
+  rowwise() %>%
+  mutate( year = as.numeric(unlist(strsplit(date_created, split = "-"))[[1]]))
+
+all_encode_totalRNAseq_fastqs <- all_encode_totalRNAseq_fastqs %>% 
+  rowwise() %>%
+  mutate( year = as.numeric(unlist(strsplit(date_created, split = "-"))[[1]]))
+
+all_encode_polyARNAseq_fastqs <- all_encode_polyARNAseq_fastqs %>% 
+  rowwise() %>%
+  mutate( year = as.numeric(unlist(strsplit(date_created, split = "-"))[[1]]))
+
+
+table(all_encode_shRNAseq_fastqs$year)
+
+table(all_encode_totalRNAseq_fastqs$year)
+
+table(all_encode_polyARNAseq_fastqs$year)
+
+```
+
+## Adding information on the organism
+
+The organism is not given in the metadata of type "file" that was obtained above, but in the metadata of type "experiment". This is pulled here and both are combined by the accession number.
+
+```{r eval=F}
+# -------------------
+# add organism
+# -------------------
+
+# shRNAseq
+query <- "search/?type=Experiment&assay_title=shRNA%20RNA-seq&limit=all"
+response <- GET(paste0(base_url, query), add_headers(accept = "application/json"))
+exp_data <- fromJSON(content(response, "text", encoding = "UTF-8"))
+
+
+exp_data_small <- exp_data$`@graph` %>% select(c("accession", "biosample_summary")) %>%
+  rowwise() %>%
+  mutate(organism  = paste(unlist(strsplit(biosample_summary, split = " "))[[1]], unlist(strsplit(biosample_summary, split = " "))[[2]])) 
+                                                           
+
+all_encode_shRNAseq_fastqs <- all_encode_shRNAseq_fastqs %>%
+  rowwise() %>%
+  mutate(exp_id  = unlist(strsplit(dataset, split = "/"))[[3]]) %>%
+  left_join(exp_data_small, by = c(exp_id = "accession"))
+
+# totalRNAseq
+query <- "search/?type=Experiment&assay_title=total%20RNA-seq&limit=all"
+response <- GET(paste0(base_url, query), add_headers(accept = "application/json"))
+exp_data <- fromJSON(content(response, "text", encoding = "UTF-8"))
+
+
+exp_data_small <- exp_data$`@graph` %>% select(c("accession", "biosample_summary")) %>%
+  rowwise() %>%
+  mutate(organism  = paste(unlist(strsplit(biosample_summary, split = " "))[[1]], unlist(strsplit(biosample_summary, split = " "))[[2]])) 
+                                                           
+
+all_encode_totalRNAseq_fastqs <- all_encode_totalRNAseq_fastqs %>%
+  rowwise() %>%
+  mutate(exp_id  = unlist(strsplit(dataset, split = "/"))[[3]]) %>%
+  left_join(exp_data_small, by = c(exp_id = "accession"))
+
+
+# polARNAseq
+query <- "search/?type=Experiment&assay_title=polyA%20plus%20RNA-seq&limit=all"
+response <- GET(paste0(base_url, query), add_headers(accept = "application/json"))
+exp_data <- fromJSON(content(response, "text", encoding = "UTF-8"))
+
+
+exp_data_small <- exp_data$`@graph` %>% select(c("accession", "biosample_summary")) %>%
+  rowwise() %>%
+  mutate(organism  = paste(unlist(strsplit(biosample_summary, split = " "))[[1]], unlist(strsplit(biosample_summary, split = " "))[[2]])) 
+                                                           
+
+all_encode_polyARNAseq_fastqs <- all_encode_polyARNAseq_fastqs %>%
+  rowwise() %>%
+  mutate(exp_id  = unlist(strsplit(dataset, split = "/"))[[3]]) %>%
+  left_join(exp_data_small, by = c(exp_id = "accession"))
+
+
+saveRDS(all_encode_shRNAseq_fastqs, paste0(out, "meta_shRNAseq_withExp.rds"))
+saveRDS(all_encode_totalRNAseq_fastqs, paste0(out, "meta_totalRNAseq_withExp.rds"))
+saveRDS(all_encode_polyARNAseq_fastqs, paste0(out, "meta_polyARNAseq_withExp.rds"))
+
+```
+
+
+```{r}
+
+all_encode_shRNAseq_fastqs <- readRDS(paste0(out, "meta_shRNAseq_withExp.rds"))
+all_encode_totalRNAseq_fastqs <- readRDS(paste0(out, "meta_totalRNAseq_withExp.rds"))
+all_encode_polyARNAseq_fastqs <- readRDS(paste0(out, "meta_polyARNAseq_withExp.rds"))
+
+# look at numbers
+table(all_encode_shRNAseq_fastqs$organism)
+table(all_encode_totalRNAseq_fastqs$organism)
+table(all_encode_polyARNAseq_fastqs$organism)
+
+
+
+```
+
+## Combination of shRNA, total and polyA+ RNAseq
+
+```{r}
+# -------------------
+# combine
+# -------------------
+all_encode_RNAseq <- rbind(all_encode_shRNAseq_fastqs %>% 
+                             select(c("exp_id", "organism", "read_count", "year", "assay_title", "biological_replicates_formatted", "biosample_summary", "target" )),
+                           
+                           all_encode_totalRNAseq_fastqs %>% 
+                             select(c("exp_id", "organism", "read_count", "year", "assay_title", "biological_replicates_formatted", "biosample_summary" )) %>% 
+                                      mutate(target = ""),
+                           
+                           all_encode_polyARNAseq_fastqs %>% 
+                             select(c("exp_id", "organism", "read_count", "year", "assay_title", "biological_replicates_formatted", "biosample_summary" )) %>% 
+                                      mutate(target = ""))
+
+
+
+
+ggplot(all_encode_RNAseq, aes(x = read_count)) +
+  geom_histogram()+
+  scale_x_log10()+
+  ggtitle("all RNAseq")
+
+
+ggplot(all_encode_RNAseq, aes(x = as.numeric(read_count), fill = year)) +
+  geom_histogram()+
+  scale_x_log10()+
+  ggtitle("all RNAseq")
+
+ggplot(all_encode_RNAseq, aes(y = as.numeric(read_count), x = as.character(year), group =year)) +
+  gghalves::geom_half_point(alpha = 0.2)+
+  gghalves::geom_half_boxplot()+
+  geom_hline(yintercept = 30000000, color = "darkred", size = 1)+
+  geom_hline(yintercept = 1000000, color = "darkorange", size = 1)+
+  scale_y_log10()+
+  ggtitle("all RNAseq")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5))+
+  xlab("")
+
+ggplot(all_encode_RNAseq, aes(y = as.numeric(read_count), x = as.character(year), group =year)) +
+  gghalves::geom_half_point(alpha = 0.2)+
+  gghalves::geom_half_boxplot()+
+  geom_hline(yintercept = 30000000, color = "darkred", size = 1)+
+  geom_hline(yintercept = 1000000, color = "darkorange", size = 1)+
+  scale_y_log10()+
+  facet_wrap(~organism)+
+  ggtitle("all RNAseq")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5))+
+  xlab("")
+
+ggplot(all_encode_RNAseq, aes(y = as.numeric(read_count), x = as.character(year), group =year)) +
+  gghalves::geom_half_point(alpha = 0.2)+
+  gghalves::geom_half_boxplot()+
+  geom_hline(yintercept = 30000000, color = "darkred", size = 1)+
+  geom_hline(yintercept = 1000000, color = "darkorange", size = 1)+
+  scale_y_log10()+
+  facet_wrap(~assay_title)+
+  ggtitle("all RNAseq")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5))+
+  xlab("")
+
+ggplot(all_encode_RNAseq, aes(y = as.numeric(read_count), x = "all")) +
+  gghalves::geom_half_point(alpha = 0.2)+
+  gghalves::geom_half_boxplot()+
+  geom_hline(yintercept = 30000000, color = "darkred", size = 1)+
+  geom_hline(yintercept = 1000000, color = "darkorange", size = 1)+
+  scale_y_log10()+
+  ggtitle("all RNAseq")+
+  xlab("")
+
+```
+
+
+## Same plots for mean read number per experiment
+
+```{r}
+# --------------------
+# Mean read number per experiment
+# ---------------------
+
+all_encode_RNAseq <- group_by(all_encode_RNAseq, exp_id) %>%
+  mutate(mean_read_count = mean(read_count))
+
+
+ggplot(all_encode_RNAseq, aes(y = as.numeric(mean_read_count), x = as.character(year), group =year)) +
+  gghalves::geom_half_point(alpha = 0.2)+
+  gghalves::geom_half_boxplot()+
+  geom_hline(yintercept = 30000000, color = "darkred", size = 1)+
+  geom_hline(yintercept = 1000000, color = "darkorange", size = 1)+
+  scale_y_log10()+
+  ggtitle("all RNAseq", subtitle = "mean per replicate")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5))+
+  xlab("")
+
+ggplot(all_encode_RNAseq, aes(y = as.numeric(mean_read_count), x = as.character(year), group =year)) +
+  gghalves::geom_half_point(alpha = 0.2)+
+  gghalves::geom_half_boxplot()+
+  geom_hline(yintercept = 30000000, color = "darkred", size = 1)+
+  geom_hline(yintercept = 1000000, color = "darkorange", size = 1)+
+  scale_y_log10()+
+  facet_wrap(~organism)+
+  ggtitle("all RNAseq", subtitle = "mean per replicate")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5))+
+  xlab("")
+
+ggplot(all_encode_RNAseq, aes(y = as.numeric(mean_read_count), x = as.character(year), group =year)) +
+  gghalves::geom_half_point(alpha = 0.2)+
+  gghalves::geom_half_boxplot()+
+  geom_hline(yintercept = 30000000, color = "darkred", size = 1)+
+  geom_hline(yintercept = 1000000, color = "darkorange", size = 1)+
+  scale_y_log10()+
+  facet_wrap(~assay_title)+
+  ggtitle("all RNAseq", subtitle = "mean per replicate")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5))+
+  xlab("")
+
+```
+
+# What are good data sets?
+
+```{r}
+
+all_encode_RNAseq %>% subset(!is.na(read_count) ) %>% arrange(desc(mean_read_count)) %>% head(10) %>% kable()
+
+all_encode_RNAseq %>% subset(!is.na(read_count) & assay_title == "shRNA RNA-seq" ) %>% arrange(desc(mean_read_count)) %>% head(10) %>% kable()
+
+
+```
+
+
+# Mark splicing factors & RBPs
+
+
+
+
+```{r}
+# -----------------
+# get GO lists
+# -----------------
+library(BiocSet)
+library(GO.db)
+library(org.Hs.eg.db)
+
+# Splicing
+#---------------
+
+# Get all BP GO terms
+go <- go_sets(org.Hs.eg.db, "SYMBOL", go = c("GO", "GOID"), ontology = "BP")
+
+map <- map_add_set(go, GO.db, "GOID", "TERM")
+go <-  go %>% mutate_set(term = map)
+s <- es_set(go)
+
+# find term for nucleus and nucleolus
+
+# s %>% subset(grepl(s$term, pattern = "splicing"))
+s %>% subset(grepl(s$term, pattern = "binding"))
+
+splicing_set_id <- "GO:0008380"
+
+
+# get sets
+es <- es_elementset(go)
+
+splicing_set <- es %>% subset(set == splicing_set_id)
+
+# RNA binding
+# --------------
+
+go <- go_sets(org.Hs.eg.db, "SYMBOL", go = c("GO", "GOID"), ontology = "MF")
+
+map <- map_add_set(go, GO.db, "GOID", "TERM")
+go <-  go %>% mutate_set(term = map)
+s <- es_set(go)
+
+# s %>% subset(grepl(s$term, pattern = "RNA binding"))
+
+rnaBinding_set_id <- "GO:0003723"
+
+# get sets
+es <- es_elementset(go)
+
+rnaBinding_set <- es %>% subset(set == rnaBinding_set_id)
+
+
+# ---------------------
+# add to metadata
+# --------------------
+
+# only applicable for shRNA RNAseq
+shRNAseq <- all_encode_RNAseq %>% subset(!is.na(read_count) & (organism == "Homo sapiens")) %>%
+  mutate(target = unlist(strsplit(target, split = "/"))[3],
+         target = unlist(strsplit(target, split = "-"))[1])
+
+
+shRNAseq$splicing <- shRNAseq$target %in% splicing_set$element
+table(shRNAseq$splicing)
+
+shRNAseq$rnaBinding <- shRNAseq$target %in% rnaBinding_set$element
+table(shRNAseq$rnaBinding)
+
+
+ggplot(shRNAseq, aes(y = as.numeric(mean_read_count), x = splicing, colour = splicing)) +
+  gghalves::geom_half_point(alpha = 0.2)+
+  gghalves::geom_half_boxplot()+
+  geom_hline(yintercept = 30000000, color = "purple", size = 1)+
+  geom_hline(yintercept = 1000000, color = "purple", size = 1)+
+  scale_y_log10()+
+  scale_color_manual(values = c("grey", "blue"))+
+  ggtitle("all RNAseq", subtitle = "mean per replicate")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5))+
+  xlab("")
+
+ggplot(shRNAseq, aes(y = as.numeric(mean_read_count), x = rnaBinding, colour = rnaBinding)) +
+  gghalves::geom_half_point(alpha = 0.2)+
+  gghalves::geom_half_boxplot()+
+  geom_hline(yintercept = 30000000, color = "purple", size = 1)+
+  geom_hline(yintercept = 1000000, color = "purple", size = 1)+
+  scale_y_log10()+
+  scale_color_manual(values = c("grey", "blue"))+
+  ggtitle("all RNAseq", subtitle = "mean per replicate")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5))+
+  xlab("")
+
+```
+
+## Best splicing data sets
+
+```{r}
+shRNAseq %>% subset(splicing) %>% arrange(desc(mean_read_count)) %>% head(20) %>% kable()
+
+```
+
+
+
+
+
+
+
+# Session Info
+
+```{r}
+
+sessionInfo()
+
+```

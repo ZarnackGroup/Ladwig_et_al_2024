@@ -1,0 +1,109 @@
+---
+title: "5 Metaanalysis of commonly used characteristics in SRA"
+author: "Melina"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+format: 
+  html:
+    code-fold: true
+    code-overflow: scroll
+    code-summary: "Show code"
+    code-tools: true
+    code-line-numbers: true
+    
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    toc-expand: false
+    number-sections: true
+    
+    theme: sandstone
+    fontsize: 11pt
+    linestretch: 1.5
+        
+    cap-location: margin
+    crossref:
+      fig-title: Fig
+    
+    embed-resources: true
+    link-external-newwindow: true
+    smooth-scroll: true
+    
+    execute:
+      echo: true
+      warning: false
+      cache: false
+
+---
+
+```{r}
+library(httr)
+library(jsonlite)
+library(tidyverse)
+library(knitr)
+library(rentrez)
+
+theme_set(theme_bw())
+out <- "/Users/melinaklostermann/Documents/projects/xx_students/Annika_majiq_test/Ladwig_et_al_2024/4-out/"
+```
+
+```{r eval=FALSE, include=F}
+
+library(GEOmetadb)
+geometadbfile <- "/Users/melinaklostermann/Documents/projects/PublicData/GEO/GEOmetadb_2024_05_01.sqlite"
+con <- dbConnect(SQLite(), geometadbfile)
+dbListFields(con,'gsm')                                                                                                         
+
+rs <- dbGetQuery(con,paste("select ID,title,description,series_id,gsm,organism_ch1,characteristics_ch1,treatment_protocol_ch1,source_name_ch1,contact,submission_date,supplementary_file,data_row_count from gsm where", 
+                           "title like '%RNA-seq%'" ,sep=" "))
+
+
+```
+
+# Checking SRA for read counts of RNAseqs
+
+- Works over the NCBI browser via the rentrez package.
+- I can look at mak 300 samples at once.
+
+```{r}
+entrez_db_searchable("sra")
+
+s <- entrez_search(db = "sra", term = "(RNA-seq [STRA]) AND (Homo Sapiens [ORGN] AND 2024 [PDAT])", retmax = 300)
+entrez_db_links("sra")
+
+f <- entrez_fetch(db="sra", id = s$ids, retmode = "xml", rettype="runinfo", parsed=TRUE, use_history=TRUE)
+
+meta_data <- lapply(f,function(x) XML::xmlToDataFrame(x)) %>% as.data.frame()
+
+meta_data <- meta_data %>% subset(spots != 0)
+
+ggplot(meta_data, aes(x = 1, y = as.numeric(spots)))+
+  gghalves::geom_half_boxplot()+
+  gghalves::geom_half_point()+
+  scale_y_log10()+
+  geom_hline(yintercept = 30000000, color = "darkorange")+
+  ggtitle("300 RNAseq data sets from 2024")
+
+
+# Only containing the term splicing
+
+s <- entrez_search(db = "sra", term = "(RNA-seq [STRA]) AND (Homo Sapiens [ORGN] AND 2024 [PDAT] AND splicing)", retmax = 300)
+entrez_db_links("sra")
+
+f <- entrez_fetch(db="sra", id = s$ids, retmode = "xml", rettype="runinfo", parsed=TRUE, use_history=TRUE)
+
+meta_data <- lapply(f,function(x) XML::xmlToDataFrame(x)) %>% as.data.frame()
+
+meta_data <- meta_data %>% subset(spots != 0)
+
+ggplot(meta_data, aes(x = 1, y = as.numeric(spots)))+
+  gghalves::geom_half_boxplot()+
+  gghalves::geom_half_point()+
+  scale_y_log10()+
+  geom_hline(yintercept = 30000000, color = "darkorange")+
+  ggtitle("300 RNAseq data sets from 2024 connected to splicing")
+
+
+
+
+```
+
