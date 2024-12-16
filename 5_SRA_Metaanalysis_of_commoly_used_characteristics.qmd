@@ -50,12 +50,15 @@ out <- "/Users/melinaklostermann/Documents/projects/xx_students/Annika_majiq_tes
 
 library(GEOmetadb)
 geometadbfile <- "/Users/melinaklostermann/Documents/projects/PublicData/GEO/GEOmetadb_2024_05_01.sqlite"
+# SQL = Structured Query language
 con <- dbConnect(SQLite(), geometadbfile)
+
 dbListFields(con,'gsm')                                                                                                         
 
 rs <- dbGetQuery(con,paste("select ID,title,description,series_id,gsm,organism_ch1,characteristics_ch1,treatment_protocol_ch1,source_name_ch1,contact,submission_date,supplementary_file,data_row_count from gsm where", 
                            "title like '%RNA-seq%'" ,sep=" "))
 
+# does not contain read number
 
 ```
 
@@ -65,6 +68,10 @@ rs <- dbGetQuery(con,paste("select ID,title,description,series_id,gsm,organism_c
 - I can look at mak 300 samples at once.
 
 ```{r}
+
+entrez_dbs()
+entrez_db_summary("sra")
+
 entrez_db_searchable("sra")
 
 s <- entrez_search(db = "sra", term = "(RNA-seq [STRA]) AND (Homo Sapiens [ORGN] AND 2024 [PDAT])", retmax = 300)

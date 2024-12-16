@@ -35,6 +35,11 @@ format:
 
 ---
 
+```{r setup, include=FALSE}
+require("knitr")
+knitr::opts_chunk$set(warning=FALSE, message=FALSE, cache=FALSE, tidy.opts=list(width.cutoff=80))
+```
+
 ```{r}
 library(httr)
 library(jsonlite)
@@ -60,12 +65,12 @@ base_url <- "https://www.encodeproject.org/"
 # ------------------
 ## see https://www.encodeproject.org/help/rest-api/ for more info
 query <- "search/?type=File&file_format=fastq&assay_title=shRNA%20RNA-seq&frame=object&limit=all"  
-## %20 encodes an empthy space
+## this is a URI query string, %20 encodes an empthy space
 
-# Make API request
+# Make API request (API = Application Programming Interface)
 response <- httr::GET(paste0(base_url, query), add_headers(accept = "application/json"))
 
-# Parse JSON response
+# Parse JSON response (JSON = JavaScript Object Notation)
 data <- jsonlite::fromJSON(content(response, as = "text", encoding = "UTF-8"))
 
 # Most metadata is stored in data$`@graph`
