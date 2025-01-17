@@ -42,8 +42,10 @@ library(tidyverse)
 library(knitr)
 library(rentrez)
 
+set_entrez_key("1ac0cb6caefae06168139145ce4a97f0c509") # allows to access more data
+
 theme_set(theme_bw())
-out <- "/Users/melinaklostermann/Documents/projects/xx_students/Annika_majiq_test/Ladwig_et_al_2024/4-out/"
+out <- "/Users/melinaklostermann/Documents/projects/xx_students/Annika_majiq_test/Ladwig_et_al_2024/5-out/"
 ```
 
 ```{r eval=FALSE, include=F}
@@ -67,19 +69,25 @@ rs <- dbGetQuery(con,paste("select ID,title,description,series_id,gsm,organism_c
 - Works over the NCBI browser via the rentrez package.
 - I can look at mak 300 samples at once.
 
-```{r}
+```{r eval=FALSE}
 
 entrez_dbs()
 entrez_db_summary("sra")
 
 entrez_db_searchable("sra")
 
-s <- entrez_search(db = "sra", term = "(RNA-seq [STRA]) AND (Homo Sapiens [ORGN] AND 2024 [PDAT])", retmax = 300)
+s <- entrez_search(db = "sra", term = "(RNA-seq [STRA]) AND Homo Sapiens [ORGN] AND 2024 [PDAT] AND TRANSCRIPTOMIC [SRC]", retmax = 300)
 entrez_db_links("sra")
 
 f <- entrez_fetch(db="sra", id = s$ids, retmode = "xml", rettype="runinfo", parsed=TRUE, use_history=TRUE)
 
 meta_data <- lapply(f,function(x) XML::xmlToDataFrame(x)) %>% as.data.frame()
+
+saveRDS(meta_data, paste0(out, "sra_RNAseq_300_", Sys.Date(), ".rds"))
+```
+
+```{r}
+meta_data <- readRDS(paste0(out, "sra_RNAseq_300_2025-01-17.rds"))
 
 meta_data <- meta_data %>% subset(spots != 0)
 
@@ -89,17 +97,24 @@ ggplot(meta_data, aes(x = 1, y = as.numeric(spots)))+
   scale_y_log10()+
   geom_hline(yintercept = 30000000, color = "darkorange")+
   ggtitle("300 RNAseq data sets from 2024")
+```
 
+# Specific splicing data sets
 
+```{r}
 # Only containing the term splicing
-
-s <- entrez_search(db = "sra", term = "(RNA-seq [STRA]) AND (Homo Sapiens [ORGN] AND 2024 [PDAT] AND splicing)", retmax = 300)
+s <- entrez_search(db = "sra", term = "(RNA-seq [STRA]) AND (Homo Sapiens [ORGN] AND 2024 [PDAT] AND splicing AND TRANSCRIPTOMIC [SRC])", retmax = 300)
 entrez_db_links("sra")
 
 f <- entrez_fetch(db="sra", id = s$ids, retmode = "xml", rettype="runinfo", parsed=TRUE, use_history=TRUE)
 
 meta_data <- lapply(f,function(x) XML::xmlToDataFrame(x)) %>% as.data.frame()
 
+saveRDS(meta_data, paste0(out, "sra_RNAseq_splicing_300_", Sys.Date(), ".rds"))
+```
+
+```{r}
+meta_data <- readRDS(paste0(out, "sra_RNAseq_splicing_300_2025-01-17.rds"))
 meta_data <- meta_data %>% subset(spots != 0)
 
 ggplot(meta_data, aes(x = 1, y = as.numeric(spots)))+
@@ -110,7 +125,28 @@ ggplot(meta_data, aes(x = 1, y = as.numeric(spots)))+
   ggtitle("300 RNAseq data sets from 2024 connected to splicing")
 
 
+```
 
+
+
+# Ideas for good data sets for an additional analysis
+
+```{r}
+data_study_wise <- meta_data %>% subset(avgLength >= 300) %>% 
+  group_by(SRAStudy) %>%
+  summarise(SRAStudy = SRAStudy,
+            n_samples = n(),
+            min_spots = min(spots),
+            ) %>%
+  arrange(min_spots)
+
+data_study_wise
 
 ```
+
+Two data sets with > 100 Mio reads:
+
+SRP534967: THUMPD3 regulates alternative splicing of ECM transcripts in human lung cancer cells and promotes proliferation and migration (human)
+SRP523909: Characterization of aberrant splicing reveals CLK1 as a candidate oncogenic dependency in pediatric high-grade gliomas (human) --> Morpholino treatment
+
 
