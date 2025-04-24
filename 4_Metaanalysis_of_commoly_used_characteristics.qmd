@@ -500,7 +500,6 @@ ggplot(shRNAseq, aes(y = as.numeric(mean_read_count), x = splicing, colour = spl
   scale_color_manual(values = c("grey30", "dodgerblue3"))+
   ggtitle("all RNAseq", subtitle = "mean per replicate")+
   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5))+
-  xlab("")+
   xlab("Year")+
   ylab("Read count \n mean of replicates per experiment [log10]")
 

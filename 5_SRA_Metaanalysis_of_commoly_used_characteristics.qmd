@@ -35,6 +35,7 @@ format:
 
 ---
 
+
 ```{r}
 library(httr)
 library(jsonlite)
@@ -50,15 +51,15 @@ out <- "/Users/melinaklostermann/Documents/projects/xx_students/Annika_majiq_tes
 
 ```{r eval=FALSE, include=F}
 
-library(GEOmetadb)
-geometadbfile <- "/Users/melinaklostermann/Documents/projects/PublicData/GEO/GEOmetadb_2024_05_01.sqlite"
-# SQL = Structured Query language
-con <- dbConnect(SQLite(), geometadbfile)
-
-dbListFields(con,'gsm')                                                                                                         
-
-rs <- dbGetQuery(con,paste("select ID,title,description,series_id,gsm,organism_ch1,characteristics_ch1,treatment_protocol_ch1,source_name_ch1,contact,submission_date,supplementary_file,data_row_count from gsm where", 
-                           "title like '%RNA-seq%'" ,sep=" "))
+# library(GEOmetadb)
+# geometadbfile <- "/Users/melinaklostermann/Documents/projects/PublicData/GEO/GEOmetadb_2024_05_01.sqlite"
+# # SQL = Structured Query language
+# con <- dbConnect(SQLite(), geometadbfile)
+# 
+# dbListFields(con,'gsm')                                                                                                         
+# 
+# rs <- dbGetQuery(con,paste("select ID,title,description,series_id,gsm,organism_ch1,characteristics_ch1,treatment_protocol_ch1,source_name_ch1,contact,submission_date,supplementary_file,data_row_count from gsm where", 
+#                            "title like '%RNA-seq%'" ,sep=" "))
 
 # does not contain read number
 
@@ -68,6 +69,8 @@ rs <- dbGetQuery(con,paste("select ID,title,description,series_id,gsm,organism_c
 
 - Works over the NCBI browser via the rentrez package.
 - I can look at mak 300 samples at once.
+
+## 2024 RNAseq data sets
 
 ```{r eval=FALSE}
 
@@ -99,9 +102,55 @@ ggplot(meta_data, aes(x = 1, y = as.numeric(spots)))+
   ggtitle("300 RNAseq data sets from 2024")
 ```
 
-# Specific splicing data sets
+## 2009-2024 
+
+```{r eval=FALSE}
+# all years 
+entrez_dbs()
+entrez_db_summary("sra")
+
+entrez_db_searchable("sra")
+
+meta_data_all_years <- setNames(vector("list", length = 16), 2009:2024)
+
+for (year in 2009:2024){
+  s = entrez_search(db = "sra", term = paste0("(RNA-seq [STRA]) AND Homo Sapiens [ORGN] AND ", year, " [PDAT] AND TRANSCRIPTOMIC [SRC]"), retmax = 300)
+  entrez_db_links("sra")
+  
+  f = entrez_fetch(db="sra", id = s$ids, retmode = "xml", rettype="runinfo", parsed=TRUE, use_history=TRUE)
+  
+  meta_data = lapply(f,function(x) XML::xmlToDataFrame(x)) %>% as.data.frame()
+  meta_data$year = year
+  meta_data_all_years[[as.character(year)]] = meta_data
+}
+
+meta_data_all_years = map_dfr(meta_data_all_years, ~.x)
+
+saveRDS(meta_data_all_years, paste0(out, "sra_RNAseq_300_2009-2024.rds"))
+```
 
 ```{r}
+meta_data_all_years <- readRDS(paste0(out, "sra_RNAseq_300_2009-2024.rds"))
+
+meta_data_all_years <- meta_data_all_years%>% subset(spots != 0)
+
+ggplot(meta_data_all_years, aes(x = as.character(year), y = as.numeric(spots)))+
+  ggrastr::rasterise( gghalves::geom_half_point(alpha = 0.2, color = "grey50"), dpi= 300)+
+  gghalves::geom_half_boxplot()+
+  scale_y_log10()+
+  geom_hline(yintercept = 30000000, color = "darkorange")+
+  ylab("Read count \n per sample [log10]")+
+  xlab("Year")
+
+ggsave(paste0(out, "sra_RNAseq_300_2009-2024.pdf"), width = 4, height = 3)
+
+```
+
+
+
+# Specific splicing data sets
+
+```{r eval = F}
 # Only containing the term splicing
 s <- entrez_search(db = "sra", term = "(RNA-seq [STRA]) AND (Homo Sapiens [ORGN] AND 2024 [PDAT] AND splicing AND TRANSCRIPTOMIC [SRC])", retmax = 300)
 entrez_db_links("sra")
@@ -112,6 +161,7 @@ meta_data <- lapply(f,function(x) XML::xmlToDataFrame(x)) %>% as.data.frame()
 
 saveRDS(meta_data, paste0(out, "sra_RNAseq_splicing_300_", Sys.Date(), ".rds"))
 ```
+
 
 ```{r}
 meta_data <- readRDS(paste0(out, "sra_RNAseq_splicing_300_2025-01-17.rds"))
@@ -127,12 +177,50 @@ ggplot(meta_data, aes(x = 1, y = as.numeric(spots)))+
 
 ```
 
+```{r}
+
+meta_data_all_years_spl <- setNames(vector("list", length = 16), 2009:2024)
+
+for (year in 2020:2024){
+  s = entrez_search(db = "sra", term = paste0("(RNA-seq [STRA]) AND Homo Sapiens [ORGN] AND ", year, " [PDAT] AND splicing AND TRANSCRIPTOMIC [SRC]"), retmax = 300)
+  entrez_db_links("sra")
+  
+  f = entrez_fetch(db="sra", id = s$ids, retmode = "xml", rettype="runinfo", parsed=TRUE, use_history=TRUE)
+  
+  meta_data = lapply(f,function(x) XML::xmlToDataFrame(x)) %>% as.data.frame()
+  meta_data$year = year
+  meta_data_all_years_spl[[as.character(year)]] = meta_data
+}
+
+meta_data_all_years_spl = map_dfr(meta_data_all_years_spl, ~.x)
+
+saveRDS(meta_data_all_years_spl, paste0(out, "sra_RNAseq_splicing_300_2009-2024.rds"))
+
+
+```
+
+```{r}
+meta_data_all_years_spl <- readRDS(paste0(out, "sra_RNAseq_splicing_300_2009-2024.rds"))
+
+meta_data_all_years_spl <- meta_data_all_years_spl %>% subset(spots != 0)
+
+ggplot(meta_data_all_years_spl, aes(x = as.character(year), y = as.numeric(spots)))+
+  ggrastr::rasterise( gghalves::geom_half_point(alpha = 0.2, color = "grey50"), dpi= 300)+
+  gghalves::geom_half_boxplot()+
+  scale_y_log10()+
+  geom_hline(yintercept = 30000000, color = "darkorange")+
+  ylab("Read count \n per sample [log10]")+
+  xlab("Year")
+
+
+```
+
 
 
 # Ideas for good data sets for an additional analysis
 
 ```{r}
-data_study_wise <- meta_data %>% subset(avgLength >= 300) %>% 
+data_study_wise <- meta_data_all_years_spl %>% subset(avgLength >= 300) %>% 
   group_by(SRAStudy) %>%
   summarise(SRAStudy = SRAStudy,
             n_samples = n(),
@@ -140,7 +228,10 @@ data_study_wise <- meta_data %>% subset(avgLength >= 300) %>%
             ) %>%
   arrange(min_spots)
 
-data_study_wise
+data_study_wise <- data_study_wise %>%
+  subset(., as.numeric(min_spots) > 100000000)
+
+unique(data_study_wise$SRAStudy)
 
 ```
 
@@ -148,6 +239,5 @@ Two data sets with > 100 Mio reads:
 
 SRP534967: THUMPD3 regulates alternative splicing of ECM transcripts in human lung cancer cells and promotes proliferation and migration (human)
 SRP523909: Characterization of aberrant splicing reveals CLK1 as a candidate oncogenic dependency in pediatric high-grade gliomas (human) --> Morpholino treatment
-
 
 
