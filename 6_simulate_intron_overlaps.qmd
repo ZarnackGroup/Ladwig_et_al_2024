@@ -1,0 +1,331 @@
+---
+title: "6 Intron-spanning reads with big RNA-seq file"
+author: "Melina"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+format: 
+  html:
+    code-fold: true
+    code-overflow: scroll
+    code-summary: "Show code"
+    code-tools: true
+    code-line-numbers: true
+    
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    toc-expand: false
+    number-sections: true
+    
+    theme: sandstone
+    fontsize: 11pt
+    linestretch: 1.5
+        
+    cap-location: margin
+    crossref:
+      fig-title: Fig
+    
+    embed-resources: true
+    link-external-newwindow: true
+    smooth-scroll: true
+    
+    execute:
+      echo: true
+      warning: false
+      cache: false
+
+---
+
+
+
+```{r}
+library(tidyverse)
+library(purrr)
+library(ComplexHeatmap)
+library(knitr)
+library(GenomicFeatures)
+library(GenomicRanges)
+library(RColorBrewer)
+
+theme_set(theme_classic())
+out <- "/Users/melinaklostermann/Documents/projects/xx_students/Annika_majiq_test/Ladwig_et_al_2024/6-out/"
+
+col_read_lenghts <- brewer.pal(7, "Oranges")[2:7]
+col_read_depth <- pals::ocean.algae(14)[2:14]
+```
+
+
+
+```{r}
+
+# Load the data
+files <- list.files("/Users/melinaklostermann/Documents/projects/xx_students/Annika_majiq_test/Ladwig_et_al_2024/6-out/", pattern = "Aligned.sortedByCoord.out.bed_intron_overlap_results.rds", full.names = TRUE)
+
+file_names <- list.files("/Users/melinaklostermann/Documents/projects/xx_students/Annika_majiq_test/Ladwig_et_al_2024/6-out/", pattern = "Aligned.sortedByCoord.out.bed_intron_overlap_results.rds", full.names = FALSE)
+file_names <- gsub("_SRR20828728_Aligned.sortedByCoord.out.bed_intron_overlap_results.rds", "", file_names)
+
+overlaps <- lapply(files, function(x) readRDS(x))
+
+ 
+# make one df per read lenght by combining all read depths                  
+n <- names(overlaps[[1]])
+
+make_overlap_df <- function(o,n){
+  o <- map(o, ~as.data.frame(.x))
+  n <- as.list(n)
+  o <- map2(o, n, ~mutate(.x, n_reads = .y))
+  o <- bind_rows(o)
+  o  <- dplyr::rename(o, n_overlaps = ".x")
+  return(o)
+}
+
+overlaps <- lapply(overlaps, function(x) make_overlap_df(x,n))
+
+# make one df with all read lengths
+overlaps <- map2(overlaps, as.list(file_names), ~mutate(.x, read_length = .y))
+overlaps <- bind_rows(overlaps)
+
+```
+
+# Detectable introns
+
+```{r}
+# Get Number of detectable Introns
+overlaps_detactable <- summarize(overlaps, 
+                                 n_detactable = as.numeric(sum( n_overlaps >= 3)),
+                                 .by = c("read_length", "n_reads") )
+
+overlaps_detactable_m  <- overlaps_detactable  %>%
+  pivot_wider(
+    names_from = read_length,
+    values_from = n_detactable 
+  )
+
+n <- overlaps_detactable_m $n_reads
+overlaps_detactable_m $n_reads <- NULL
+
+overlaps_detactable_m  <- as.matrix(overlaps_detactable_m)
+overlaps_detactable_m  <- overlaps_detactable_m[, c("36", "50", "75", "100", "125", "150")]
+rownames(overlaps_detactable_m ) <- n
+
+
+
+col <- circlize::colorRamp2(c(1100000, 1000000, 800000, 600000, 400000, 100000, 40000), viridis::magma(8)[2:8])
+
+Heatmap(overlaps_detactable_m ,
+        col = col,
+        cluster_rows = FALSE,
+        cluster_columns = FALSE)
+
+pdf(paste0(out, "heatmap_detactable_introns.pdf"), width = 8, height = 13)
+Heatmap(overlaps_detactable_m ,
+        col = col,
+        cluster_rows = FALSE,
+        cluster_columns = FALSE)
+dev.off()
+
+```
+
+## Note: Mappability
+
+```{r}
+mapping_df <- data.frame(read_length = factor(c("36", "50", "75", "100", "125", "150"), levels = c("36", "50", "75", "100", "125", "150")),
+               mappability = c(122553712, 127824376, 132614130, 
+                               133645169, 129489035, 120558456))
+
+ggplot(mapping_df, aes(x = read_length, y = mappability)) +
+  geom_col() +
+  labs(x = "Read Length", y = "Mappability (bp)") 
+
+ggsave(paste0(out, "mappability.pdf"), width = 4, height = 6, units = "cm")
+
+kable(mapping_df)
+```
+
+Note: 
+- STAR counts mapped reads paired end eg 133645169 reads for 100nt read length. When I make a bed file from the bam files it contains twice the number of rows, one for read one and one for read two. This is also what majiw uses therefore I use the double number. ( We should not this somewher in the manuscript)
+
+- The mappability seems best for reads between 75 and 100 nts and is worst for 36nt and 150nt reads. This might be because default STAR parameters are optimized for this range. I could therefore not calculate the highest category for 36nt and 150nt.
+
+
+```{r}
+
+gg_df <- overlaps_detactable
+gg_df$n_reads <- factor(gg_df$n_reads, levels = unique(gg_df$n_reads))
+
+ggplot(gg_df, aes(x = as.numeric(read_length), color = n_reads, y = n_detactable)) +
+  geom_point(stat = "identity", position = "dodge") +
+  labs(x = "Read Length", y = "Number of detectable introns (3 intron-spanning reads)", fill = "Number of reads") +
+  geom_line(aes(group = n_reads) ) +
+  scale_color_manual(values = col_read_depth)+
+  scale_y_continuous(breaks = seq(2e5, 10e5, by = 2e5), labels = scales::label_number(scale = 1))+
+  theme(legend.position = "top")
+
+ggsave(paste0(out, "read_length_detactable_intr.pdf"), width = 6, height = 7 )
+  
+
+gg_df <- overlaps_detactable
+gg_df$read_length <- factor(gg_df$read_length, levels = c("36", "50", "75", "100", "125", "150"))
+
+ggplot(gg_df, aes(x = as.numeric(n_reads), color = read_length, y = n_detactable)) +
+  #geom_hline(yintercept = 1288547, linetype = "dashed", color = "grey") +
+  geom_point(stat = "identity", position = "dodge") +
+  labs(x = "Read Depth", y = "Number of detectable introns (3 intron-spanning reads)", fill = "Number of reads") +
+  geom_line(aes(group = read_length) )+
+  scale_color_manual(values = col_read_lenghts) +
+  scale_y_continuous(breaks = seq(2e5, 10e5, by = 2e5), labels = scales::label_number(scale = 1))+
+  theme(legend.position = "top")
+
+  
+ggsave(paste0(out, "read_depth_detactable_intr.pdf"), width = 6, height = 7 )
+  
+```
+
+Not saturation yet!
+
+# Quantifiable introns
+
+```{r}
+# Get Number of detectable Introns
+overlaps_quant <- summarize(overlaps, 
+                                 n_quantifiable = as.numeric(sum( n_overlaps >= 10)),
+                                 .by = c("read_length", "n_reads") )
+
+overlaps_quant_m  <- overlaps_quant  %>%
+  pivot_wider(
+    names_from = read_length,
+    values_from = n_quantifiable
+  )
+
+n <- overlaps_quant_m $n_reads
+overlaps_quant_m $n_reads <- NULL
+
+overlaps_quant_m  <- as.matrix(overlaps_quant_m)
+overlaps_quant_m  <- overlaps_quant_m[, c("36", "50", "75", "100", "125", "150")]
+rownames(overlaps_quant_m ) <- n
+
+
+
+col <- circlize::colorRamp2(c( 1000000, 800000, 600000, 400000, 100000, 40000, 5000), viridis::magma(8)[2:8])
+
+Heatmap(overlaps_quant_m ,
+        col = col,
+        cluster_rows = FALSE,
+        cluster_columns = FALSE)
+
+```
+
+
+```{r}
+
+ggplot(overlaps_quant, aes(x = as.numeric(read_length), color = n_reads, y = n_quantifiable)) +
+  geom_point(stat = "identity", position = "dodge") +
+  labs(x = "Read Length", y = "Number of quantifiable introns (10 intron-spanning reads)", fill = "Number of reads") +
+  geom_line(aes(group = n_reads) )
+
+ggplot(overlaps_quant, aes(x = as.numeric(n_reads), color = read_length, y = n_quantifiable)) +
+  geom_point(stat = "identity", position = "dodge") +
+  labs(x = "Read Length", y = "Number of quantifiable introns (10 intron-spanning reads)", fill = "Number of reads") +
+  geom_line(aes(group = read_length) )
+
+```
+
+# Theoretical maximum:
+
+
+```{r}
+read_counts <- read.delim("/Users/melinaklostermann/Documents/projects/xx_students/Annika_majiq_test/Ladwig_et_al_2024/6-out/read_counts.txt", skip = 1 ) %>%
+  dplyr::rename(cnts = "X.storage.zar.projects.melina.Ladwig.2024.big_file_for_subsample.02_alignment.150_SRR20828728_Aligned.sortedByCoord.out.bam")
+
+
+anno_txdb <- loadDb("/Users/melinaklostermann/Documents/projects/anno/GENCODEv41-p13/gencode.v41.annotation.txdb.sqilte")
+anno <- rtracklayer::import("/Users/melinaklostermann/Documents/projects/anno/GENCODEv41-p13/gencode.v41.annotation.gtf.gz")
+
+# expressed genes
+gns <- genes(anno_txdb)
+gns <- as.data.frame(gns) %>%
+  left_join(read_counts %>% dplyr::select(., Geneid,cnts), 
+            by = c(gene_id = "Geneid"))
+
+gns_exp <- gns %>% subset(as.numeric(cnts) >= 10) %>%
+  makeGRangesFromDataFrame(keep.extra.columns = T)
+
+cat("N genes in annotation:")
+
+nrow(gns)
+
+cat("N genes with at least 10 reads:")
+NROW(gns_exp)
+
+
+# Get introns
+introns_list <- intronsByTranscript(anno_txdb, use.names = TRUE)
+
+introns <- unlist(introns_list)
+
+# expressed transcripts
+transcripts_introns <- names(introns)
+anno_expr <- anno[anno$gene_id %in% gns_exp$gene_id ]
+
+transcripts_of_expressed_genes <- transcripts_introns[transcripts_introns %in% anno_expr$transcript_id]
+i_expressed <- introns_list[unique(transcripts_of_expressed_genes)] %>% unlist()
+
+
+cat("N introns in annotation:")
+NROW(introns)
+cat("N introns belonging to a gene with at least 10 reads:")
+NROW(i_expressed)
+
+```
+
+
+Can this be true? 
+
+Look for introns in non expressed genes ...
+
+```{r}
+gns_not_exp <- gns %>% subset(as.numeric(cnts) == 0) 
+anno_not_exp <- anno[anno$gene_id %in% gns_not_exp$gene_id ] %>% 
+  as.data.frame() 
+
+gns_not_exp <- anno_not_exp %>% subset(type == "gene")
+
+cat("Number of not expressed genes:")
+nrow(gns_not_exp)
+
+ggplot( gns_not_exp , aes(x = gene_type)) +
+  geom_bar() +
+  labs(x = "Gene type", y = "Number of genes") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+cat("Number of not expressed protein coding genes:")
+
+nrow(gns_not_exp %>% subset(gene_type == "protein_coding"))
+
+transcripts_of_non_expressed_genes <- anno_not_exp$transcript_id %>% unique()
+transcripts_of_non_expressed_genes_with_introns <- transcripts_introns[transcripts_introns %in% transcripts_of_non_expressed_genes] %>% unique()
+i_non_expressed <- introns_list[transcripts_of_non_expressed_genes_with_introns ] %>% unlist()
+
+cat("Number of transcripts of non sepressed genes, that contain one or more introns:")
+length(transcripts_of_non_expressed_genes_with_introns)
+
+cat("number of introns in non expressed genes:")
+NROW(i_non_expressed)
+
+
+```
+
+
+
+
+# Session Info
+
+```{r}
+sessionInfo()
+
+```
+
+
+```{r}
+
+
+```

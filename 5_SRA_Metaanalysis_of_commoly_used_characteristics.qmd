@@ -127,6 +127,8 @@ for (year in 2009:2024){
 meta_data_all_years = map_dfr(meta_data_all_years, ~.x)
 
 saveRDS(meta_data_all_years, paste0(out, "sra_RNAseq_300_2009-2024.rds"))
+
+
 ```
 
 ```{r}
@@ -135,14 +137,17 @@ meta_data_all_years <- readRDS(paste0(out, "sra_RNAseq_300_2009-2024.rds"))
 meta_data_all_years <- meta_data_all_years%>% subset(spots != 0)
 
 ggplot(meta_data_all_years, aes(x = as.character(year), y = as.numeric(spots)))+
-  ggrastr::rasterise( gghalves::geom_half_point(alpha = 0.2, color = "grey50"), dpi= 300)+
-  gghalves::geom_half_boxplot()+
+  ggrastr::rasterise( gghalves::geom_half_point(alpha = 0.6, color = "black", size = 0.8), dpi = 300)+
+  gghalves::geom_half_boxplot(outlier.shape = NA, fill = "slategrey", alpha = 0.5)+
+  geom_hline(yintercept = 30000000, color = "turquoise3", size = 1)+
+  geom_hline(yintercept = 1000000, color = "aquamarine3", size = 1)+
   scale_y_log10()+
-  geom_hline(yintercept = 30000000, color = "darkorange")+
   ylab("Read count \n per sample [log10]")+
   xlab("Year")
 
-ggsave(paste0(out, "sra_RNAseq_300_2009-2024.pdf"), width = 4, height = 3)
+ggsave(paste0(out, "sra_RNAseq_300_2009-2024.pdf"), width = 5, height = 3)
+
+median(as.numeric(meta_data_all_years$spots), na.rm = T)
 
 ```
 
@@ -240,4 +245,9 @@ Two data sets with > 100 Mio reads:
 SRP534967: THUMPD3 regulates alternative splicing of ECM transcripts in human lung cancer cells and promotes proliferation and migration (human)
 SRP523909: Characterization of aberrant splicing reveals CLK1 as a candidate oncogenic dependency in pediatric high-grade gliomas (human) --> Morpholino treatment
 
+# Session Info
 
+```{r}
+sessionInfo()
+
+```
