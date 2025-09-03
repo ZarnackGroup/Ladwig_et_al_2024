@@ -394,10 +394,11 @@ all_encode_RNAseq_int_org2 <- subset(all_encode_RNAseq, organism %in% c( "Caenor
 all_encode_RNAseq_int_org2$organism <- factor(all_encode_RNAseq_int_org2$organism, levels = c("Drosophila melanogaster", "Caenorhabditis elegans"))
 
 p0 = ggplot(all_encode_RNAseq_int_org1, aes(y = as.numeric(mean_read_count), x = as.character(year), group =year)) +
-  ggrastr::rasterise( gghalves::geom_half_point(alpha = 0.6, color = "black", size = 0.8), dpi = 300)+
-  gghalves::geom_half_boxplot(outlier.shape = NA, fill = "slategrey", alpha = 0.5)+
-  geom_hline(yintercept = 30000000, color = "turquoise3", size = 1)+
-  geom_hline(yintercept = 1000000, color = "aquamarine3", size = 1)+
+  geom_hline(yintercept = 30000000,  size = 1.5)+
+  geom_hline(yintercept = 30000000, color = "#064644", size = 1)+
+  geom_hline(yintercept = 1000000,  size = 1.5)+
+  geom_hline(yintercept = 1000000, color = "#C7F8F5", size = 1)+
+  geom_boxplot( fill = "white")+
   scale_y_log10()+
   facet_wrap(~organism, ncol = 4, scales = "free_x")+
   #ggtitle("all RNAseq", subtitle = "mean per replicate")+
@@ -426,24 +427,25 @@ p01
 
 ggsave(p01, filename = paste0(out, "Encode_read_count_dm_ce.pdf"), width = 5, height = 3)
 
-p01 = ggplot(all_encode_RNAseq_int_org, aes(y = as.numeric(mean_read_count), x = as.character(year), group =year)) +
-  #ggrastr::rasterise( gghalves::geom_half_point(alpha = 0.8, color = "slategray", size = 0.8), dpi = 300)+
-  geom_boxplot(fill = "slategrey", alpha = 0.5)+
-  geom_hline(yintercept = 30000000, color = "turquoise3", size = 1)+
-  geom_hline(yintercept = 1000000, color = "aquamarine3", size = 1)+
-  scale_y_log10()+
-  facet_wrap(~organism, ncol = 4, scales = "free_x")+
-  #ggtitle("all RNAseq", subtitle = "mean per replicate")+
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5))+
-  xlab("Year")+
-  ylab("Read count \n mean of replicates per experiment [log10]")
-
-p01
-
-ggsave(p01, filename = paste0(out, "Encode_read_count_altcol.pdf"), width = 10, height = 3)
-
-group_by(all_encode_RNAseq_int_org, organism) %>%
-summarise( median(as.numeric(mean_read_count), na.rm  = T))
+# p01 = ggplot(all_encode_RNAseq_int_org, aes(y = as.numeric(mean_read_count), x = as.character(year), group =year)) +
+#   geom_hline(yintercept = 30000000,  size = 1.5)+
+#   geom_hline(yintercept = 30000000, color = "#064644", size = 1)+
+#   geom_hline(yintercept = 1000000,  size = 1.5)+
+#   geom_hline(yintercept = 1000000, color = "#C7F8F5", size = 1)+
+#   geom_boxplot( fill = "white")+
+#   scale_y_log10()+
+#   facet_wrap(~organism, ncol = 4, scales = "free_x")+
+#   #ggtitle("all RNAseq", subtitle = "mean per replicate")+
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5))+
+#   xlab("Year")+
+#   ylab("Read count \n mean of replicates per experiment [log10]")
+# 
+# p01
+# 
+# ggsave(p01, filename = paste0(out, "Encode_read_count_altcol.pdf"), width = 10, height = 3)
+# 
+# group_by(all_encode_RNAseq_int_org, organism) %>%
+# summarise( median(as.numeric(mean_read_count), na.rm  = T))
 
 ```
 

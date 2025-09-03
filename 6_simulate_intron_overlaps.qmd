@@ -123,6 +123,10 @@ Heatmap(overlaps_detactable_m ,
         cluster_columns = FALSE)
 dev.off()
 
+kable(as.data.frame(overlaps_detectable_m)) %>%
+  kableExtra::scroll_box(width = "100%")
+
+
 ```
 
 ## Note: Mappability
@@ -212,20 +216,46 @@ Heatmap(overlaps_quant_m ,
         cluster_rows = FALSE,
         cluster_columns = FALSE)
 
+pdf(paste0(out, "heatmap_quantifiable_introns.pdf"), width = 8, height = 13)
+Heatmap(overlaps_detactable_m ,
+        col = col,
+        cluster_rows = FALSE,
+        cluster_columns = FALSE)
+dev.off()
+
+kable(as.data.frame(overlaps_quant_m)) %>%
+  kableExtra::scroll_box(width = "100%")
+
 ```
 
 
 ```{r}
+gg_df <- overlaps_quant
+gg_df$n_reads <- factor(gg_df$n_reads, levels = unique(gg_df$n_reads))
 
-ggplot(overlaps_quant, aes(x = as.numeric(read_length), color = n_reads, y = n_quantifiable)) +
+ggplot(gg_df, aes(x = as.numeric(read_length), color = n_reads, y = n_quantifiable)) +
   geom_point(stat = "identity", position = "dodge") +
   labs(x = "Read Length", y = "Number of quantifiable introns (10 intron-spanning reads)", fill = "Number of reads") +
-  geom_line(aes(group = n_reads) )
+  geom_line(aes(group = n_reads) )  +
+  scale_color_manual(values = col_read_depth)+
+  scale_y_continuous(breaks = seq(0, 10e5, by = 2e5), labels = scales::label_number(scale = 1))+
+  theme(legend.position = "top")
 
-ggplot(overlaps_quant, aes(x = as.numeric(n_reads), color = read_length, y = n_quantifiable)) +
+ggsave(paste0(out, "read_length_quantifiable_intr.pdf"), width = 6, height = 7 )
+
+gg_df <- overlaps_quant
+gg_df$read_length <- factor(gg_df$read_length, levels = c("36", "50", "75", "100", "125", "150"))
+
+ggplot(gg_df, aes(x = as.numeric(n_reads), color = read_length, y = n_quantifiable)) +
   geom_point(stat = "identity", position = "dodge") +
   labs(x = "Read Length", y = "Number of quantifiable introns (10 intron-spanning reads)", fill = "Number of reads") +
-  geom_line(aes(group = read_length) )
+  geom_line(aes(group = read_length) )+
+  scale_color_manual(values = col_read_lenghts) +
+  scale_y_continuous(breaks = seq(0, 10e5, by = 2e5), labels = scales::label_number(scale = 1))+
+  theme(legend.position = "top")
+
+  
+ggsave(paste0(out, "read_depth_quantifiable_intr.pdf"), width = 6, height = 7 )
 
 ```
 
