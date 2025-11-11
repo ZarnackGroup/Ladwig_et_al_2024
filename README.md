@@ -1,4 +1,4 @@
-# How to choose the optimal RNA-Seq library characteristics for alternative splicing analysis (with MAJIQ)
+# The impact of read depth and read length on RNA-seq splicing analysis
 ****
 This Github repository provides the code the for the publication Ladwig et al. 2024.
 
@@ -15,7 +15,7 @@ The rendered HTML file is available at https://annikala.github.io/.
 
 ## 2 Impact of library characteristics on alternative splice analysis
 ****
-The R scripts contain the code used to investigate the influence of read length (2.1a - *U2AF2* KD, 2.1b - *UPF1* KD), read depth (2.2) and replicate number (2.3) on: 
+The R scripts contain the code used to investigate the influence of read length (2.1a - *U2AF2* KD, 2.1b - *UPF1* KD) and read depth (2.2) on: 
 - read alignment
 - LSV detection
 - LSV quantification
