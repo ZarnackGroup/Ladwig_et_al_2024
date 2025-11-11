@@ -27,7 +27,7 @@ div.mint {background-color:#D9EAE4; border-radius: 5px; padding: 20px;}
 
 <br>
 
-![](C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/figures/workflow_github.png){width=70%}
+![](C:/Users/ladwi/Desktop/HiWi/project_impact_read_length/figures/workflow.png){width=70%}
 
 <br>
 <br>
@@ -131,7 +131,7 @@ samtools view -b -s 0.96323430963552176957701491760975332532564543923003 U2AF2_1
 # <span style="color:#2C5753"> **6 MAJIQ**
 ***
 
-### <span style="color:#2C5753"> **6.1 `majiq build`** - LSV detection `r knitr::asis_output("&#x1F50E;")`  &nbsp; &nbsp; <span style="color:#2373F6"> $\bullet$ vary replicate number
+### <span style="color:#2C5753"> **6.1 `majiq build`** - LSV detection `r knitr::asis_output("&#x1F50E;")`  &nbsp; &nbsp; <span style="color:#2373F6"> 
 ***
 
 #### <span style="color:#2C5753"> **Configuration file**
@@ -139,8 +139,6 @@ samtools view -b -s 0.96323430963552176957701491760975332532564543923003 U2AF2_1
 To run `majiq build`, a configuration file is needed that contains the bam file paths and information about read length, strandness, the reference genome and the grouping of the experiments.
 
 The config file was created for 100, 75, 50 and 36 nt read length and for each of the 1 - 30 million reads read depth.
-
-To investigate the influence of the replicate number, four different config files were created: three for the three combinations of two samples and one for the three samples. 
 
 ```
 [info]
@@ -193,33 +191,6 @@ for reads in ${reads[@]}; do
   -j 6 \
   -o $OUTDIR/U2AF2/read_depth/$reads
 done
-```
-
-<br>
-
-#### <span style="color:#2C5753"> **LSV detection for different numbers of replicates**:
-```{r, engine = 'bash', eval = FALSE}
-# FILES AND DIRS
-GFF3="gencode.v41.annotation.gff3"
-BUILD="majiq/build/endodermal_vs_H1/100"
-
-# SAMPLE COMBINATIONS
-combos_2er=('_1_2' '_1_3' '_2_3')
-
-# MAJIQ BUILD 
-# 2 samples
-for combi in ${combos_2er[@]}; do
-  majiq build $GFF3 \
-  -c $BUILD/2_samples/sample$combi/endo_vs_H1_100_config_file_2_samples$combi.txt \
-  -j 6 \
-  -o $BUILD/2_samples/sample$combi
-done
-
-# 3 samples
-majiq build $GFF3 \
--c $BUILD/3_samples/endo_vs_H1_100_config_file_3_samples.txt \
--j 6 \
--o $BUILD/3_samples
 ```
 
 <br>
