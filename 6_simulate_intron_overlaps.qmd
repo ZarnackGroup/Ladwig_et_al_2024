@@ -87,50 +87,9 @@ overlaps <- bind_rows(overlaps)
 
 ```
 
-# Detectable introns
-
-```{r}
-# Get Number of detectable Introns
-overlaps_detactable <- summarize(overlaps, 
-                                 n_detactable = as.numeric(sum( n_overlaps >= 3)),
-                                 .by = c("read_length", "n_reads") )
-
-overlaps_detactable_m  <- overlaps_detactable  %>%
-  pivot_wider(
-    names_from = read_length,
-    values_from = n_detactable 
-  )
-
-n <- overlaps_detactable_m $n_reads
-overlaps_detactable_m $n_reads <- NULL
-
-overlaps_detactable_m  <- as.matrix(overlaps_detactable_m)
-overlaps_detactable_m  <- overlaps_detactable_m[, c("36", "50", "75", "100", "125", "150")]
-rownames(overlaps_detactable_m ) <- n
 
 
-
-col <- circlize::colorRamp2(c(1100000, 1000000, 800000, 600000, 400000, 100000, 40000), viridis::magma(8)[2:8])
-
-Heatmap(overlaps_detactable_m ,
-        col = col,
-        cluster_rows = FALSE,
-        cluster_columns = FALSE)
-
-pdf(paste0(out, "heatmap_detactable_introns.pdf"), width = 8, height = 13)
-Heatmap(overlaps_detactable_m ,
-        col = col,
-        cluster_rows = FALSE,
-        cluster_columns = FALSE)
-dev.off()
-
-kable(as.data.frame(overlaps_detactable_m)) %>%
-  kableExtra::scroll_box(width = "100%")
-
-
-```
-
-## Note: Mappability
+# Note: Mappability
 
 ```{r}
 mapping_df <- data.frame(read_length = factor(c("36", "50", "75", "100", "125", "150"), levels = c("36", "50", "75", "100", "125", "150")),
@@ -146,48 +105,16 @@ ggsave(paste0(out, "mappability.pdf"), width = 4, height = 6, units = "cm")
 kable(mapping_df)
 ```
 
-Note: 
+
 - STAR counts mapped reads paired end eg 133645169 reads for 100nt read length. When I make a bed file from the bam files it contains twice the number of rows, one for read one and one for read two. This is also what majiq uses therefore I use the double number. ( We should not this somewher in the manuscript)
 
 - The mappability seems best for reads between 75 and 100 nts and is worst for 36nt and 150nt reads. This might be because default STAR parameters are optimized for this range. I could therefore not calculate the highest category for 36nt and 150nt.
 
 
-```{r}
-
-gg_df <- overlaps_detactable
-gg_df$n_reads <- factor(gg_df$n_reads, levels = unique(gg_df$n_reads))
-
-ggplot(gg_df, aes(x = as.numeric(read_length), color = n_reads, y = n_detactable)) +
-  geom_point(stat = "identity", position = "dodge") +
-  labs(x = "Read Length", y = "Number of detectable introns (3 intron-spanning reads)", fill = "Number of reads") +
-  geom_line(aes(group = n_reads) ) +
-  scale_color_manual(values = col_read_depth)+
-  scale_y_continuous(breaks = seq(2e5, 10e5, by = 2e5), labels = scales::label_number(scale = 1))+
-  theme(legend.position = "top")
-
-ggsave(paste0(out, "read_length_detactable_intr.pdf"), width = 6, height = 7 )
-  
-
-gg_df <- overlaps_detactable
-gg_df$read_length <- factor(gg_df$read_length, levels = c("36", "50", "75", "100", "125", "150"))
-
-ggplot(gg_df, aes(x = as.numeric(n_reads), color = read_length, y = n_detactable)) +
-  #geom_hline(yintercept = 1288547, linetype = "dashed", color = "grey") +
-  geom_point(stat = "identity", position = "dodge") +
-  labs(x = "Read Depth", y = "Number of detectable introns (3 intron-spanning reads)", fill = "Number of reads") +
-  geom_line(aes(group = read_length) )+
-  scale_color_manual(values = col_read_lenghts) +
-  scale_y_continuous(breaks = seq(2e5, 10e5, by = 2e5), labels = scales::label_number(scale = 1))+
-  theme(legend.position = "top")
-
-  
-ggsave(paste0(out, "read_depth_detactable_intr.pdf"), width = 6, height = 7 )
-  
-```
-
-Not saturation yet!
 
 # Quantifiable introns
+
+## Heatmap and table
 
 ```{r}
 # Get Number of detectable Introns
@@ -195,6 +122,7 @@ overlaps_quant <- summarize(overlaps,
                                  n_quantifiable = as.numeric(sum( n_overlaps >= 10)),
                                  .by = c("read_length", "n_reads") )
 
+# adjust row and column names for heatmap
 overlaps_quant_m  <- overlaps_quant  %>%
   pivot_wider(
     names_from = read_length,
@@ -209,9 +137,10 @@ overlaps_quant_m  <- overlaps_quant_m[, c("36", "50", "75", "100", "125", "150")
 rownames(overlaps_quant_m ) <- n
 
 
-
+# color for heatmap
 col <- circlize::colorRamp2(c( 1000000, 800000, 600000, 400000, 100000, 40000, 5000), viridis::magma(8)[2:8])
 
+# heatmap
 Heatmap(overlaps_quant_m ,
         col = col,
         cluster_rows = FALSE,
@@ -224,11 +153,14 @@ Heatmap(overlaps_detactable_m ,
         cluster_columns = FALSE)
 dev.off()
 
+# table
 kable(as.data.frame(overlaps_quant_m)) %>%
   kableExtra::scroll_box(width = "100%")
 
 ```
+## Plot read depth and read length separately 
 
+(for supplements)
 
 ```{r}
 gg_df <- overlaps_quant
@@ -261,7 +193,7 @@ ggsave(paste0(out, "read_depth_quantifiable_intr.pdf"), width = 6, height = 7 )
 
 ```
 
-# Plot read depth vs read length
+## Plot read depth vs read length
 
 ```{r}
 
@@ -296,7 +228,9 @@ ggsave(paste0(out, "read_depth_vs_length_quantifiable_intr.pdf"), width = 6, hei
 
 
 
-# Theoretical maximum:
+# Theoretical maximum 
+
+(for reviewer response)
 
 
 ```{r}
@@ -345,7 +279,7 @@ NROW(i_expressed)
 ```
 
 
-Can this be true? 
+## Sanity check ... on expression of genes with introns
 
 Look for introns in non expressed genes ...
 
@@ -383,7 +317,6 @@ NROW(i_non_expressed)
 
 
 
-
 # Session Info
 
 ```{r}
@@ -391,8 +324,3 @@ sessionInfo()
 
 ```
 
-
-```{r}
-
-
-```
