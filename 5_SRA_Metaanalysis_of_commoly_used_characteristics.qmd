@@ -1,0 +1,158 @@
+---
+title: "5 Metaanalysis of commonly used characteristics in SRA"
+author: "Melina"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+format: 
+  html:
+    code-fold: true
+    code-overflow: scroll
+    code-summary: "Show code"
+    code-tools: true
+    code-line-numbers: true
+    
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    toc-expand: false
+    number-sections: true
+    
+    theme: sandstone
+    fontsize: 11pt
+    linestretch: 1.5
+        
+    cap-location: margin
+    crossref:
+      fig-title: Fig
+    
+    embed-resources: true
+    link-external-newwindow: true
+    smooth-scroll: true
+    
+    execute:
+      echo: true
+      warning: false
+      cache: false
+
+---
+
+
+```{r}
+library(httr)
+library(jsonlite)
+library(tidyverse)
+library(knitr)
+library(rentrez)
+
+set_entrez_key("1ac0cb6caefae06168139145ce4a97f0c509") # allows to access more data
+
+source("/Users/melinaklostermann/Documents/projects/R_general_functions/theme_paper.R")
+theme_set(theme_paper())
+
+out <- "/Users/melinaklostermann/Documents/projects/xx_students/Annika_majiq_test/Ladwig_et_al_2024/5-out/"
+```
+
+
+
+# Checking SRA for read counts of RNAseqs
+
+- Works over the NCBI browser via the rentrez package.
+- I can look at max 300 samples at once.
+
+
+
+## 2009-2024 
+
+```{r eval=FALSE}
+# ----------------------
+# get metadata from sra
+# ----------------------
+
+# use sra database
+entrez_dbs()
+entrez_db_summary("sra")
+
+entrez_db_searchable("sra")
+
+#make a separate search for each year from 2009 to 2024
+meta_data_all_years <- setNames(vector("list", length = 16), 2009:2024)
+
+for (year in 2009:2024){
+  # used search term:
+  s = entrez_search(db = "sra", term = paste0("(RNA-seq [STRA]) AND Homo Sapiens [ORGN] AND ", year, " [PDAT] AND TRANSCRIPTOMIC [SRC]"), retmax = 300)
+  entrez_db_links("sra")
+  
+  # get metadata
+  f = entrez_fetch(db="sra", id = s$ids, retmode = "xml", rettype="runinfo", parsed=TRUE, use_history=TRUE)
+  
+  # turn into data.frame
+  meta_data = lapply(f,function(x) XML::xmlToDataFrame(x)) %>% as.data.frame()
+  # add to year list
+  meta_data$year = year
+  meta_data_all_years[[as.character(year)]] = meta_data
+}
+
+# make one df of all years
+meta_data_all_years = map_dfr(meta_data_all_years, ~.x)
+
+# save
+saveRDS(meta_data_all_years, paste0(out, "sra_RNAseq_300_2009-2024.rds"))
+
+```
+
+
+```{r}
+#--------------------
+# Plot for paper
+#--------------------
+
+color <- RColorBrewer::brewer.pal(6, "Blues")
+color <- color[3:6]
+
+# load save data
+meta_data_all_years <- readRDS(paste0(out, "sra_RNAseq_300_2009-2024.rds"))
+
+# remove samples with 0 spots
+meta_data_all_years <- meta_data_all_years %>% subset(spots != 0) %>%
+  # multiply number of spots by 2 when paired end
+  mutate(reads = case_when(LibraryLayout == "PAIRED" ~ as.numeric(spots_with_mates)*2,
+                           T ~ as.numeric(spots))) %>%
+  subset(reads !=0)
+
+# create year groups
+meta_data_all_years <- mutate(meta_data_all_years, year_groups = 
+                              case_when(as.character(year) %in% c("2009", "2010", "2011", "2012") ~ "2009-2012",
+                                        as.character(year)  %in% c("2013", "2014", "2015", "2016") ~ "2013-2016",
+                                        as.character(year)  %in% c("2017", "2018", "2019", "2020") ~ "2017-2020",
+                                        as.character(year)  %in% c( "2021", "2022", "2023", "2024") ~ "2020-2024",
+                                        TRUE ~ NA))
+
+# median for manuscript text
+median(as.numeric(meta_data_all_years$reads), na.rm = T)
+
+# plot
+p0 = ggplot(meta_data_all_years, aes(y = reads, x = year_groups, fill =year_groups)) +
+  geom_hline(yintercept = 30000000, color = "grey40", size = 1, linetype = "dashed")+
+   geom_hline(yintercept = 10000000, color = "grey40", size = 1, linetype = "dashed")+
+  geom_hline(yintercept = 50000000, color = "grey40", size = 1, linetype = "dashed")+
+  geom_boxplot( alpha = 0.8)+
+  scale_fill_manual( values = color)+
+  scale_y_log10()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+        legend.position = "top")+
+  xlab("Year")+
+  ylab("Read count \n mean of replicates per experiment [log10]")
+
+p0
+# save plot
+ggsave(paste0(out, "sra_RNAseq_300_2009-2024.pdf"), width = 4, height = 4)
+
+
+```
+
+
+# Session Info
+
+```{r}
+sessionInfo()
+
+```

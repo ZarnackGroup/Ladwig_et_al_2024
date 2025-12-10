@@ -1,0 +1,78 @@
+---
+title: "Untitled"
+format: html
+---
+
+## Quarto
+
+```{r}
+library(httr)
+library(jsonlite)
+library(tidyverse)
+```
+
+```{r}
+base_url <- "https://www.encodeproject.org/"
+query <- "search/?type=File&file_format=fastq&assay_title=shRNA%20RNA-seq&frame=object&limit=all" # %20 encodes an empthy space
+# https://www.encodeproject.org/help/rest-api/
+
+# Make API request
+response <- GET(paste0(base_url, query), add_headers(accept = "application/json"))
+
+# Parse JSON response
+data <- fromJSON(content(response, "text", encoding = "UTF-8"))
+
+data$`@graph`$read_count
+
+
+all_encode_shRNAseq_fastqs <- data$`@graph` %>% subset(status == "released")
+
+ggplot(all_encode_shRNAseq_fastqs, aes(x = read_count)) +
+  geom_histogram()
+
+all_encode_shRNAseq_fastqs[which(all_encode_shRNAseq_fastqs$read_count == min(all_encode_shRNAseq_fastqs$read_count)),]
+
+table(all_encode_shRNAseq_fastqs$biosample_ontology)
+
+encode_cellines_RNAseq <- all_encode_shRNAseq_fastqs %>% subset(biosample_ontology != "/biosample-types/whole_organisms_UBERON_0000468/")
+
+
+ggplot(encode_cellines_RNAseq, aes(x = read_count)) +
+  geom_histogram()
+
+head(all_encode_shRNAseq_fastqs)
+```
+
+
+```{r}
+
+library(GEOmetadb)
+geometadbfile <- "/Users/melinaklostermann/Documents/projects/PublicData/GEO/GEOmetadb_2024_05_01.sqlite"
+con <- dbConnect(SQLite(), geometadbfile)
+dbListFields(con,'gsm')                                                                                                         
+
+rs <- dbGetQuery(con,paste("select ID,title,description,series_id,gsm,organism_ch1,characteristics_ch1,treatment_protocol_ch1,source_name_ch1,contact,submission_date,supplementary_file from gsm where", 
+                           "title like '%RNA-seq%'" ,sep=" "))
+
+
+rs <- dbGetQuery(con,paste("select * from gsm where", 
+                           "title like '%RNA-seq%'" ,sep=" "))
+
+
+
+
+#########################
+gse_id <- "GSE10967" # Replace with your GEO Series ID
+
+# Get GEO dataset
+gse <- getGEO(gse_id, GSEMatrix = TRUE)
+
+# Extract metadata
+metadata <- pData(phenoData(gse[[1]]))
+
+# View metadata
+head(metadata)
+
+
+
+```

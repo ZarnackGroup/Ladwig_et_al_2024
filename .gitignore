@@ -1,0 +1,8 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*out/*
+*.html
+.DS_Store
+SRR20828728.bed.rds
