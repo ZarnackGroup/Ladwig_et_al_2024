@@ -45,7 +45,9 @@ library(rentrez)
 
 set_entrez_key("1ac0cb6caefae06168139145ce4a97f0c509") # allows to access more data
 
-theme_set(theme_bw())
+source("/Users/melinaklostermann/Documents/projects/R_general_functions/theme_paper.R")
+theme_set(theme_paper())
+
 out <- "/Users/melinaklostermann/Documents/projects/xx_students/Annika_majiq_test/Ladwig_et_al_2024/5-out/"
 ```
 
@@ -128,27 +130,66 @@ meta_data_all_years = map_dfr(meta_data_all_years, ~.x)
 
 saveRDS(meta_data_all_years, paste0(out, "sra_RNAseq_300_2009-2024.rds"))
 
-
 ```
 
+
 ```{r}
+# Plot for paper
+color <- RColorBrewer::brewer.pal(6, "Blues")
+color <- color[3:6]
+
 meta_data_all_years <- readRDS(paste0(out, "sra_RNAseq_300_2009-2024.rds"))
 
-meta_data_all_years <- meta_data_all_years%>% subset(spots != 0)
+meta_data_all_years %>% subset(LibraryLayout == "PAIRED")
 
-ggplot(meta_data_all_years, aes(x = as.character(year), y = as.numeric(spots)))+
-  geom_hline(yintercept = 30000000,  size = 1.5)+
-  geom_hline(yintercept = 30000000, color = "#064644", size = 1)+
-  geom_hline(yintercept = 1000000,  size = 1.5)+
-  geom_hline(yintercept = 1000000, color = "#C7F8F5", size = 1)+
-  geom_boxplot( fill = "white")+
+meta_data_all_years <- meta_data_all_years %>% subset(spots != 0) %>%
+  mutate(reads = case_when(LibraryLayout == "PAIRED" ~ as.numeric(spots_with_mates)*2,
+                           T ~ as.numeric(spots))) %>%
+  subset(reads !=0)
+  
+meta_data_all_years <- mutate(meta_data_all_years, year_groups = 
+                              case_when(as.character(year) %in% c("2009", "2010", "2011", "2012") ~ "2009-2012",
+                                        as.character(year)  %in% c("2013", "2014", "2015", "2016") ~ "2013-2016",
+                                        as.character(year)  %in% c("2017", "2018", "2019", "2020") ~ "2017-2020",
+                                        as.character(year)  %in% c( "2021", "2022", "2023", "2024") ~ "2020-2024",
+                                        TRUE ~ NA))
+
+#meta_data_all_years %>% subset(., is.na(year_groups))
+
+median(as.numeric(meta_data_all_years$reads), na.rm = T)
+
+
+p0 = ggplot(meta_data_all_years, aes(y = reads, x = year_groups, fill =year_groups)) +
+  geom_hline(yintercept = 30000000, color = "grey40", size = 1, linetype = "dashed")+
+   geom_hline(yintercept = 10000000, color = "grey40", size = 1, linetype = "dashed")+
+  geom_hline(yintercept = 50000000, color = "grey40", size = 1, linetype = "dashed")+
+  geom_boxplot( alpha = 0.8)+
+  scale_fill_manual( values = color)+
   scale_y_log10()+
-  ylab("Read count \n per sample [log10]")+
-  xlab("Year")
+ 
+  #ggtitle("all RNAseq", subtitle = "mean per replicate")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+        legend.position = "top")+
+  xlab("Year")+
+  ylab("Read count \n mean of replicates per experiment [log10]")
 
-ggsave(paste0(out, "sra_RNAseq_300_2009-2024.pdf"), width = 5, height = 3)
+p0
+ggsave(paste0(out, "sra_RNAseq_300_2009-2024.pdf"), width = 4, height = 4)
 
-median(as.numeric(meta_data_all_years$spots), na.rm = T)
+
+
+color <- RColorBrewer::brewer.pal(6, "Blues")
+color <- color[3:6]
+
+ggplot(meta_data_all_years, aes( x = reads,  color =year_groups)) +
+  geom_vline(xintercept = 30000000, size = 1, color = "grey40")+
+ stat_ecdf(size = 1)+
+  scale_color_manual( values = color)+
+  scale_x_log10()+
+  xlab("read count as mean of replicates per experiment [log10]")+
+  ylab("cumulative fraction")
+
+ggsave( filename = paste0(out, "sra_RNAseq_300_2009-2024_ecdf.pdf"), width = 4, height = 4)
 
 ```
 
@@ -222,6 +263,7 @@ ggplot(meta_data_all_years_spl, aes(x = as.character(year), y = as.numeric(spots
 
 
 ```
+
 
 
 

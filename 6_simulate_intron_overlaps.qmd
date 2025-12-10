@@ -46,7 +46,8 @@ library(GenomicFeatures)
 library(GenomicRanges)
 library(RColorBrewer)
 
-theme_set(theme_classic())
+source("/Users/melinaklostermann/Documents/projects/R_general_functions/theme_paper.R")
+theme_set(theme_paper())
 out <- "/Users/melinaklostermann/Documents/projects/xx_students/Annika_majiq_test/Ladwig_et_al_2024/6-out/"
 
 col_read_lenghts <- brewer.pal(7, "Oranges")[2:7]
@@ -123,7 +124,7 @@ Heatmap(overlaps_detactable_m ,
         cluster_columns = FALSE)
 dev.off()
 
-kable(as.data.frame(overlaps_detectable_m)) %>%
+kable(as.data.frame(overlaps_detactable_m)) %>%
   kableExtra::scroll_box(width = "100%")
 
 
@@ -146,7 +147,7 @@ kable(mapping_df)
 ```
 
 Note: 
-- STAR counts mapped reads paired end eg 133645169 reads for 100nt read length. When I make a bed file from the bam files it contains twice the number of rows, one for read one and one for read two. This is also what majiw uses therefore I use the double number. ( We should not this somewher in the manuscript)
+- STAR counts mapped reads paired end eg 133645169 reads for 100nt read length. When I make a bed file from the bam files it contains twice the number of rows, one for read one and one for read two. This is also what majiq uses therefore I use the double number. ( We should not this somewher in the manuscript)
 
 - The mappability seems best for reads between 75 and 100 nts and is worst for 36nt and 150nt reads. This might be because default STAR parameters are optimized for this range. I could therefore not calculate the highest category for 36nt and 150nt.
 
@@ -239,7 +240,8 @@ ggplot(gg_df, aes(x = as.numeric(read_length), color = n_reads, y = n_quantifiab
   geom_line(aes(group = n_reads) )  +
   scale_color_manual(values = col_read_depth)+
   scale_y_continuous(breaks = seq(0, 10e5, by = 2e5), labels = scales::label_number(scale = 1))+
-  theme(legend.position = "top")
+  theme(legend.position = "top")+
+  scale_x_continuous(breaks = c(36, 50, 75, 100, 125, 150))
 
 ggsave(paste0(out, "read_length_quantifiable_intr.pdf"), width = 6, height = 7 )
 
@@ -248,7 +250,7 @@ gg_df$read_length <- factor(gg_df$read_length, levels = c("36", "50", "75", "100
 
 ggplot(gg_df, aes(x = as.numeric(n_reads), color = read_length, y = n_quantifiable)) +
   geom_point(stat = "identity", position = "dodge") +
-  labs(x = "Read Length", y = "Number of quantifiable introns (10 intron-spanning reads)", fill = "Number of reads") +
+  labs(x = "Read Depth", y = "Number of quantifiable introns (10 intron-spanning reads)", fill = "Number of reads") +
   geom_line(aes(group = read_length) )+
   scale_color_manual(values = col_read_lenghts) +
   scale_y_continuous(breaks = seq(0, 10e5, by = 2e5), labels = scales::label_number(scale = 1))+
@@ -258,6 +260,41 @@ ggplot(gg_df, aes(x = as.numeric(n_reads), color = read_length, y = n_quantifiab
 ggsave(paste0(out, "read_depth_quantifiable_intr.pdf"), width = 6, height = 7 )
 
 ```
+
+# Plot read depth vs read length
+
+```{r}
+
+gg_df$n_quantifiable_round <- floor(gg_df$n_quantifiable / 50000) * 50000
+gg_df$read_length <- as.numeric(as.character(gg_df$read_length))
+
+ggplot(gg_df, aes(x = 
+as.numeric(read_length), y = as.numeric(n_reads), color = as.character(n_quantifiable_round)))+
+  geom_point()+
+  geom_line()
+
+
+gg_df2 <- gg_df %>% subset(n_quantifiable_round %in% c(600000, 700000, 800000))
+
+
+ggplot(gg_df2, aes(x = 
+read_length, y = as.numeric(n_reads) , color = as.character(n_quantifiable_round)))+
+  #scale_y_log10()+
+  geom_point()+
+  geom_line()+
+  scale_x_continuous(breaks = c(36, 50, 75, 100, 125, 150))+
+  scale_y_continuous(breaks = c(0, 10000000, 30000000, 50000000, 75000000, 100000000, 150000000, 200000000))+
+  scale_color_manual(values = c("deeppink", "deeppink3", "darkorchid4"), labels = c("600K", "700K", "800K"))+
+  xlab("read length")+
+  ylab("read depth ")+
+  theme(legend.position = "none") +
+  expand_limits(y = 0)
+
+ggsave(paste0(out, "read_depth_vs_length_quantifiable_intr.pdf"), width = 6, height = 6)
+
+```
+
+
 
 # Theoretical maximum:
 
