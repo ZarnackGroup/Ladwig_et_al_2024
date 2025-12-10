@@ -51,102 +51,74 @@ theme_set(theme_paper())
 out <- "/Users/melinaklostermann/Documents/projects/xx_students/Annika_majiq_test/Ladwig_et_al_2024/5-out/"
 ```
 
-```{r eval=FALSE, include=F}
 
-# library(GEOmetadb)
-# geometadbfile <- "/Users/melinaklostermann/Documents/projects/PublicData/GEO/GEOmetadb_2024_05_01.sqlite"
-# # SQL = Structured Query language
-# con <- dbConnect(SQLite(), geometadbfile)
-# 
-# dbListFields(con,'gsm')                                                                                                         
-# 
-# rs <- dbGetQuery(con,paste("select ID,title,description,series_id,gsm,organism_ch1,characteristics_ch1,treatment_protocol_ch1,source_name_ch1,contact,submission_date,supplementary_file,data_row_count from gsm where", 
-#                            "title like '%RNA-seq%'" ,sep=" "))
-
-# does not contain read number
-
-```
 
 # Checking SRA for read counts of RNAseqs
 
 - Works over the NCBI browser via the rentrez package.
-- I can look at mak 300 samples at once.
+- I can look at max 300 samples at once.
 
-## 2024 RNAseq data sets
 
-```{r eval=FALSE}
-
-entrez_dbs()
-entrez_db_summary("sra")
-
-entrez_db_searchable("sra")
-
-s <- entrez_search(db = "sra", term = "(RNA-seq [STRA]) AND Homo Sapiens [ORGN] AND 2024 [PDAT] AND TRANSCRIPTOMIC [SRC]", retmax = 300)
-entrez_db_links("sra")
-
-f <- entrez_fetch(db="sra", id = s$ids, retmode = "xml", rettype="runinfo", parsed=TRUE, use_history=TRUE)
-
-meta_data <- lapply(f,function(x) XML::xmlToDataFrame(x)) %>% as.data.frame()
-
-saveRDS(meta_data, paste0(out, "sra_RNAseq_300_", Sys.Date(), ".rds"))
-```
-
-```{r}
-meta_data <- readRDS(paste0(out, "sra_RNAseq_300_2025-01-17.rds"))
-
-meta_data <- meta_data %>% subset(spots != 0)
-
-ggplot(meta_data, aes(x = 1, y = as.numeric(spots)))+
-  gghalves::geom_half_boxplot()+
-  gghalves::geom_half_point()+
-  scale_y_log10()+
-  geom_hline(yintercept = 30000000, color = "darkorange")+
-  ggtitle("300 RNAseq data sets from 2024")
-```
 
 ## 2009-2024 
 
 ```{r eval=FALSE}
-# all years 
+# ----------------------
+# get metadata from sra
+# ----------------------
+
+# use sra database
 entrez_dbs()
 entrez_db_summary("sra")
 
 entrez_db_searchable("sra")
 
+#make a separate search for each year from 2009 to 2024
 meta_data_all_years <- setNames(vector("list", length = 16), 2009:2024)
 
 for (year in 2009:2024){
+  # used search term:
   s = entrez_search(db = "sra", term = paste0("(RNA-seq [STRA]) AND Homo Sapiens [ORGN] AND ", year, " [PDAT] AND TRANSCRIPTOMIC [SRC]"), retmax = 300)
   entrez_db_links("sra")
   
+  # get metadata
   f = entrez_fetch(db="sra", id = s$ids, retmode = "xml", rettype="runinfo", parsed=TRUE, use_history=TRUE)
   
+  # turn into data.frame
   meta_data = lapply(f,function(x) XML::xmlToDataFrame(x)) %>% as.data.frame()
+  # add to year list
   meta_data$year = year
   meta_data_all_years[[as.character(year)]] = meta_data
 }
 
+# make one df of all years
 meta_data_all_years = map_dfr(meta_data_all_years, ~.x)
 
+# save
 saveRDS(meta_data_all_years, paste0(out, "sra_RNAseq_300_2009-2024.rds"))
 
 ```
 
 
 ```{r}
+#--------------------
 # Plot for paper
+#--------------------
+
 color <- RColorBrewer::brewer.pal(6, "Blues")
 color <- color[3:6]
 
+# load save data
 meta_data_all_years <- readRDS(paste0(out, "sra_RNAseq_300_2009-2024.rds"))
 
-meta_data_all_years %>% subset(LibraryLayout == "PAIRED")
-
+# remove samples with 0 spots
 meta_data_all_years <- meta_data_all_years %>% subset(spots != 0) %>%
+  # multiply number of spots by 2 when paired end
   mutate(reads = case_when(LibraryLayout == "PAIRED" ~ as.numeric(spots_with_mates)*2,
                            T ~ as.numeric(spots))) %>%
   subset(reads !=0)
-  
+
+# create year groups
 meta_data_all_years <- mutate(meta_data_all_years, year_groups = 
                               case_when(as.character(year) %in% c("2009", "2010", "2011", "2012") ~ "2009-2012",
                                         as.character(year)  %in% c("2013", "2014", "2015", "2016") ~ "2013-2016",
@@ -154,11 +126,10 @@ meta_data_all_years <- mutate(meta_data_all_years, year_groups =
                                         as.character(year)  %in% c( "2021", "2022", "2023", "2024") ~ "2020-2024",
                                         TRUE ~ NA))
 
-#meta_data_all_years %>% subset(., is.na(year_groups))
-
+# median for manuscript text
 median(as.numeric(meta_data_all_years$reads), na.rm = T)
 
-
+# plot
 p0 = ggplot(meta_data_all_years, aes(y = reads, x = year_groups, fill =year_groups)) +
   geom_hline(yintercept = 30000000, color = "grey40", size = 1, linetype = "dashed")+
    geom_hline(yintercept = 10000000, color = "grey40", size = 1, linetype = "dashed")+
@@ -166,129 +137,18 @@ p0 = ggplot(meta_data_all_years, aes(y = reads, x = year_groups, fill =year_grou
   geom_boxplot( alpha = 0.8)+
   scale_fill_manual( values = color)+
   scale_y_log10()+
- 
-  #ggtitle("all RNAseq", subtitle = "mean per replicate")+
   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
         legend.position = "top")+
   xlab("Year")+
   ylab("Read count \n mean of replicates per experiment [log10]")
 
 p0
+# save plot
 ggsave(paste0(out, "sra_RNAseq_300_2009-2024.pdf"), width = 4, height = 4)
 
 
-
-color <- RColorBrewer::brewer.pal(6, "Blues")
-color <- color[3:6]
-
-ggplot(meta_data_all_years, aes( x = reads,  color =year_groups)) +
-  geom_vline(xintercept = 30000000, size = 1, color = "grey40")+
- stat_ecdf(size = 1)+
-  scale_color_manual( values = color)+
-  scale_x_log10()+
-  xlab("read count as mean of replicates per experiment [log10]")+
-  ylab("cumulative fraction")
-
-ggsave( filename = paste0(out, "sra_RNAseq_300_2009-2024_ecdf.pdf"), width = 4, height = 4)
-
 ```
 
-
-
-# Specific splicing data sets
-
-```{r eval = F}
-# Only containing the term splicing
-s <- entrez_search(db = "sra", term = "(RNA-seq [STRA]) AND (Homo Sapiens [ORGN] AND 2024 [PDAT] AND splicing AND TRANSCRIPTOMIC [SRC])", retmax = 300)
-entrez_db_links("sra")
-
-f <- entrez_fetch(db="sra", id = s$ids, retmode = "xml", rettype="runinfo", parsed=TRUE, use_history=TRUE)
-
-meta_data <- lapply(f,function(x) XML::xmlToDataFrame(x)) %>% as.data.frame()
-
-saveRDS(meta_data, paste0(out, "sra_RNAseq_splicing_300_", Sys.Date(), ".rds"))
-```
-
-
-```{r}
-meta_data <- readRDS(paste0(out, "sra_RNAseq_splicing_300_2025-01-17.rds"))
-meta_data <- meta_data %>% subset(spots != 0)
-
-ggplot(meta_data, aes(x = 1, y = as.numeric(spots)))+
-  gghalves::geom_half_boxplot()+
-  gghalves::geom_half_point()+
-  scale_y_log10()+
-  geom_hline(yintercept = 30000000, color = "darkorange")+
-  ggtitle("300 RNAseq data sets from 2024 connected to splicing")
-
-
-```
-
-```{r}
-
-meta_data_all_years_spl <- setNames(vector("list", length = 16), 2009:2024)
-
-for (year in 2020:2024){
-  s = entrez_search(db = "sra", term = paste0("(RNA-seq [STRA]) AND Homo Sapiens [ORGN] AND ", year, " [PDAT] AND splicing AND TRANSCRIPTOMIC [SRC]"), retmax = 300)
-  entrez_db_links("sra")
-  
-  f = entrez_fetch(db="sra", id = s$ids, retmode = "xml", rettype="runinfo", parsed=TRUE, use_history=TRUE)
-  
-  meta_data = lapply(f,function(x) XML::xmlToDataFrame(x)) %>% as.data.frame()
-  meta_data$year = year
-  meta_data_all_years_spl[[as.character(year)]] = meta_data
-}
-
-meta_data_all_years_spl = map_dfr(meta_data_all_years_spl, ~.x)
-
-saveRDS(meta_data_all_years_spl, paste0(out, "sra_RNAseq_splicing_300_2009-2024.rds"))
-
-
-```
-
-```{r}
-meta_data_all_years_spl <- readRDS(paste0(out, "sra_RNAseq_splicing_300_2009-2024.rds"))
-
-meta_data_all_years_spl <- meta_data_all_years_spl %>% subset(spots != 0)
-
-ggplot(meta_data_all_years_spl, aes(x = as.character(year), y = as.numeric(spots)))+
-    geom_hline(yintercept = 30000000,  size = 1.5)+
-  geom_hline(yintercept = 30000000, color = "#064644", size = 1)+
-  geom_hline(yintercept = 1000000,  size = 1.5)+
-  geom_hline(yintercept = 1000000, color = "#C7F8F5", size = 1)+
-  geom_boxplot( fill = "white")+
-  scale_y_log10()+
-  ylab("Read count \n per sample [log10]")+
-  xlab("Year")
-
-
-```
-
-
-
-
-# Ideas for good data sets for an additional analysis
-
-```{r}
-data_study_wise <- meta_data_all_years_spl %>% subset(avgLength >= 300) %>% 
-  group_by(SRAStudy) %>%
-  summarise(SRAStudy = SRAStudy,
-            n_samples = n(),
-            min_spots = min(spots),
-            ) %>%
-  arrange(min_spots)
-
-data_study_wise <- data_study_wise %>%
-  subset(., as.numeric(min_spots) > 100000000)
-
-unique(data_study_wise$SRAStudy)
-
-```
-
-Two data sets with > 100 Mio reads:
-
-SRP534967: THUMPD3 regulates alternative splicing of ECM transcripts in human lung cancer cells and promotes proliferation and migration (human)
-SRP523909: Characterization of aberrant splicing reveals CLK1 as a candidate oncogenic dependency in pediatric high-grade gliomas (human) --> Morpholino treatment
 
 # Session Info
 
